@@ -124,6 +124,13 @@
 	       (list (openssh-host
 		      (name "github.com")
 		      (forward-agent? #t)
+		      (identity-file "/home/stalk/.ssh/id_ed25519"))
+		     (openssh-host
+		      (name "childhurd")
+		      (host-name "localhost")
+		      (user "stalk")
+		      (port 10022)
+		      (forward-agent? #t)
 		      (identity-file "/home/stalk/.ssh/id_ed25519"))))))
 
     ;; Channels append nonguix

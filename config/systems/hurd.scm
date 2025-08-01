@@ -43,7 +43,6 @@
                    (name "stalk")
                    (comment "Stalk's hurd")
                    (group "users")
-                   (password (crypt "evolto" "$6$abc"))
                    (supplementary-groups '("wheel"))) %base-user-accounts))
 
     (packages (cons* (operating-system-packages
@@ -53,5 +52,12 @@
      (modify-services (operating-system-user-services
                        %hurd-vm-operating-system)
        (openssh-service-type config =>
-			     (openssh-configuration (permit-root-login #t)
-						    (password-authentication? #t)))))))
+	(openssh-configuration
+	 (permit-root-login #t)
+	  (authorized-keys
+	   `(("root"
+	      ,(local-file
+		"/root/.ssh/id_ed25519_childhurd.pub"))
+	     ("stalk"
+	      ,(local-file
+		"/home/stalk/.ssh/id_ed25519.pub"))))))))))

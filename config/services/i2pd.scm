@@ -31,6 +31,32 @@
   #:use-module (srfi srfi-26)
   #:export (i2pd-configuration i2pd-configuration? i2pd-service-type))
 
+;; Set http proxy.
+(define shepherd-set-http-proxy-action
+  ;; Shepherd action to change the HTTP(S) proxy.
+  (shepherd-action
+   (name 'set-http-proxy)
+   (documentation
+    "Change the HTTP(S) proxy used by 'i2pd' and restart it.")
+   (procedure #~(lambda* (_ #:optional proxy)
+                  (let ((environment (environ)))
+                    ;; A bit of a hack: communicate PROXY to the 'start'
+                    ;; method via environment variables.
+                    (if proxy
+                        (begin
+                          (format #t "changing HTTP/HTTPS \
+proxy of 'i2pd' to ~s...~%"
+                                  proxy)
+                          (setenv "http_proxy" proxy))
+                        (begin
+                          (format #t "clearing HTTP/HTTPS \
+proxy of 'i2pd'...~%")
+                          (unsetenv "http_proxy")))
+                    (perform-service-action (lookup-service 'i2pd)
+                                            'restart)
+                    (environ environment)
+                    #t)))))
+
 ;; I2p configuration default
 (define-record-type* <i2pd-configuration> i2pd-configuration
   make-i2pd-configuration
@@ -82,6 +108,7 @@ keys = socks-keys.dat")))
 	   (documentation "Run the I2pd daemon.")
            (provision '(i2pd))
 	   (requirement '(user-processes loopback syslogd))
+	   (actions (list shepherd-set-http-proxy-action))
            (start #~(make-forkexec-constructor
 		      (list #$(file-append i2pd "/bin/i2pd")
 			    (string-append "--conf=" #$config-file)
