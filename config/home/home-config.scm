@@ -40,6 +40,7 @@
  ;; Home profile, under ~/.guix-home/profile.
  (packages (specifications->packages (list "docker-cli"
 					   "emacs"
+					   "emacs-debbugs"
 					   "emacs-geiser"
 					   "emacs-geiser-guile"
 					   "emacs-pyvenv"
