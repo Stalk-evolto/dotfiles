@@ -1,4 +1,4 @@
-;;; GNU Guix --- Functional package management for GNU
+;;; home-config --- Functional home configuration for GNU Guix.
 ;;; Copyright © 2025 Stalk Evolto <stalk-evolto@outlook.com>
 ;;;
 ;;; This file is part of GNU Guix.
@@ -33,40 +33,70 @@
   #:use-module (gnu home services dotfiles)
   #:use-module (gnu system shadow)
   #:use-module (config home services home-channels)
-  #:use-module (guix gexp))
+  #:use-module (guix gexp)
+  #:use-module (srfi srfi-1))
+
+;; Emacs compile GNU Guix to use packages.
+(define %emacs-base-packages
+  (list "aspell"
+        "aspell-dict-en"
+        "emacs"
+        "emacs-debbugs"
+        "git"
+        "ripgrep"
+        ))
+
+(define %emacs-for-guix
+  (list "emacs-geiser"
+        "emacs-geiser-guile"
+        "guile"))
+
+(define %emacs-for-c
+  (list "gcc-toolchain"))
+
+(define %emacs-for-python
+  (list "python"
+        "python-pylint"))
+
+(define %emacs-for-latex
+  (list "calc"
+        "rubber"
+        "texlive"
+        "texlive-latexmk"
+        "texlive-chktex"
+        "texlive-digestif"))
 
 (home-environment
  ;; Below is the list of packages that will show up in your
  ;; Home profile, under ~/.guix-home/profile.
- (packages (specifications->packages (list "docker-cli"
-					   "emacs"
-					   "emacs-debbugs"
-					   "emacs-geiser"
-					   "emacs-geiser-guile"
-					   "emacs-pyvenv"
-					   "firefox"
-					   "font-adobe-source-han-sans:cn"
-					   "font-wqy-microhei"
-					   "fontconfig"
-					   "gimp"
-					   "git"
-					   "gnupg"
-					   "go"
-					   "guile"
-					   "i2pd"
-					   "icedove"
-					   "kdenlive"
-					   "libreoffice"
-					   "make"
-					   "obs"
-					   "pinentry"
-					   "python"
-					   "python-virtualenv"
-					   "texlive-latex"
-					   "virt-manager"
-					   "virt-viewer"
-					   "vlc"
-					   "rust")))
+ (packages
+  (specifications->packages
+   (append
+    (list
+     "docker-cli"
+     "firefox"
+     "font-adobe-source-han-sans:cn"
+     "font-wqy-microhei"
+     "fontconfig"
+     "gimp"
+     "gnupg"
+     "go"
+     "i2pd"
+     "icedove"
+     "kdenlive"
+     "libreoffice"
+     "make"
+     "obs"
+     "pinentry"
+     "virt-manager"
+     "virt-viewer"
+     "vlc"
+     "rust")
+    %emacs-base-packages
+    %emacs-for-guix
+    %emacs-for-c
+    %emacs-for-python
+    %emacs-for-latex)))
 
  ;; Below is the list of Home services.  To search for available
  ;; services, run 'guix home search KEYWORD' in a terminal.
@@ -74,26 +104,26 @@
   (append
    (list
     ;; Uncomment the shell you wish to use for your user:
-					;(service home-bash-service-type)
-					;(service home-fish-service-type)
-					;(service home-zsh-service-type)
+                                        ;(service home-bash-service-type)
+                                        ;(service home-fish-service-type)
+                                        ;(service home-zsh-service-type)
 
     (service home-bash-service-type
-	     (home-bash-configuration
-	      (aliases '(("grep" . "grep --color=auto")
-			 ("ip" . "ip -color=auto")
-			 ("ll" . "ls -l")
-			 ("ls" . "ls -p --color=auto")))
-	      (bashrc (list (local-file "../../files/.bashrc"
-					"bashrc")))
-	      (bash-profile (list (local-file "../../files/.bash_profile"
-					      "bash_profile")))
-	      (environment-variables
-	       `(
-		 ("GTK_IM_MODULE" . "ibus")
-		 ("QT_IM_MODULE" . "ibus")
-		 ("XMODIFILERS" . "@im=ibus")
-		 ))))
+             (home-bash-configuration
+              (aliases '(("grep" . "grep --color=auto")
+                         ("ip" . "ip -color=auto")
+                         ("ll" . "ls -l")
+                         ("ls" . "ls -p --color=auto")))
+              (bashrc (list (local-file "../../files/.bashrc"
+                                        "bashrc")))
+              (bash-profile (list (local-file "../../files/.bash_profile"
+                                              "bash_profile")))
+              (environment-variables
+               `(
+                 ("GTK_IM_MODULE" . "ibus")
+                 ("QT_IM_MODULE" . "ibus")
+                 ("XMODIFILERS" . "@im=ibus")
+                 ))))
 
     ;; GNU Readline Package CONFIG file .inputrc
     (service home-inputrc-service-type
@@ -102,48 +132,48 @@
                `(("Control-l" . "clear-screen")))
               (variables
                `(("bell-style" . "visible")
-		 ("colored-completion-prefix" . #t)
-		 ("editing-mode" . "emacs")
-		 ("show-mode-in-prompt" . #t)))
-	      (conditional-constructs
-	       `(
-		 ("$if mode=emacs" .
-		  ,(home-inputrc-configuration
+                 ("colored-completion-prefix" . #t)
+                 ("editing-mode" . "emacs")
+                 ("show-mode-in-prompt" . #t)))
+              (conditional-constructs
+               `(
+                 ("$if mode=emacs" .
+                  ,(home-inputrc-configuration
                     (variables
                      `(("colored-stats" . #t)
                        ("enable-bracketed-paste" . #t)))))
-		 ("$else" .
-		  ,(home-inputrc-configuration
+                 ("$else" .
+                  ,(home-inputrc-configuration
                     (variables
                      `(("show-all-if-ambiguous" . #t)))))
-		 ("$endif" . #t)))))
+                 ("$endif" . #t)))))
 
     ;; Openssh cleint CONFIG file.
     (service home-openssh-service-type
-	     (home-openssh-configuration
-	      (hosts
-	       (list (openssh-host
-		      (name "github.com")
-		      (forward-agent? #t)
-		      (identity-file "/home/stalk/.ssh/id_ed25519"))
-		     (openssh-host
-		      (name "childhurd")
-		      (host-name "localhost")
-		      (user "stalk")
-		      (port 10022)
-		      (forward-agent? #t)
-		      (identity-file "/home/stalk/.ssh/id_ed25519"))))))
+             (home-openssh-configuration
+              (hosts
+               (list (openssh-host
+                      (name "github.com")
+                      (forward-agent? #t)
+                      (identity-file "/home/stalk/.ssh/id_ed25519"))
+                     (openssh-host
+                      (name "childhurd")
+                      (host-name "localhost")
+                      (user "stalk")
+                      (port 10022)
+                      (forward-agent? #t)
+                      (identity-file "/home/stalk/.ssh/id_ed25519"))))))
 
     ;; Channels append nonguix
     channels-append-service
 
     ;; Backup my CONFIG file to dotfiles/files.
     (service home-dotfiles-service-type
-	     (home-dotfiles-configuration
-	      (directories '("../../files"))
-	      (excluded '(".*~"
-			  ".*\\.swp"
-			  "\\.git"
-			  "\\.gitignore"
-			  "\\.bash.*")))))
+             (home-dotfiles-configuration
+              (directories '("../../files"))
+              (excluded '(".*~"
+                          ".*\\.swp"
+                          "\\.git"
+                          "\\.gitignore"
+                          "\\.bash.*")))))
    %base-home-services)))

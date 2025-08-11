@@ -1,4 +1,4 @@
-;;; GNU Guix --- Functional package management for GNU
+;;; i2pd.scm --- Functional service for GNU Guix.
 ;;; Copyright © 2025 Stalk Evolto <stalk-evolto@outlook.com>
 ;;;
 ;;; This file is part of GNU Guix.
@@ -31,32 +31,6 @@
   #:use-module (srfi srfi-26)
   #:export (i2pd-configuration i2pd-configuration? i2pd-service-type))
 
-;; Set http proxy.
-(define shepherd-set-http-proxy-action
-  ;; Shepherd action to change the HTTP(S) proxy.
-  (shepherd-action
-   (name 'set-http-proxy)
-   (documentation
-    "Change the HTTP(S) proxy used by 'i2pd' and restart it.")
-   (procedure #~(lambda* (_ #:optional proxy)
-                  (let ((environment (environ)))
-                    ;; A bit of a hack: communicate PROXY to the 'start'
-                    ;; method via environment variables.
-                    (if proxy
-                        (begin
-                          (format #t "changing HTTP/HTTPS \
-proxy of 'i2pd' to ~s...~%"
-                                  proxy)
-                          (setenv "http_proxy" proxy))
-                        (begin
-                          (format #t "clearing HTTP/HTTPS \
-proxy of 'i2pd'...~%")
-                          (unsetenv "http_proxy")))
-                    (perform-service-action (lookup-service 'i2pd)
-                                            'restart)
-                    (environ environment)
-                    #t)))))
-
 ;; I2p configuration default
 (define-record-type* <i2pd-configuration> i2pd-configuration
   make-i2pd-configuration
@@ -64,16 +38,14 @@ proxy of 'i2pd'...~%")
   (i2pd i2pd-configuration-i2pd
         (default i2pd))
   (config-file i2pd-configuration-config-file
-               (default (plain-file "i2pd.conf" "\
-log = true
-ipv6 = true")))
+               (default (plain-file "i2pd.conf" "log = true\nipv6 = true")))
   (pid-file i2pd-configuration-pid-file
             (default "/var/run/i2pd/i2pd.pid"))
   (log-file i2pd-configuration-log-file
             (default "/var/log/i2pd/i2pd.log"))
   (tunnels-config-file i2pd-configuration-tunnels-config-file
-                       (default (plain-file "tunnels.conf" "\
-[alt-socks]
+                       (default (plain-file "tunnels.conf"
+                                            "[alt-socks]
 type = socks
 address = 127.0.0.1
 port = 14447
@@ -98,30 +70,41 @@ keys = socks-keys.dat")))
 (define (i2pd-shepherd-service config)
   "Return a <shepherd-service> running I2pd."
   (let ((i2pd (i2pd-configuration-i2pd config))
-	(config-file (i2pd-configuration-config-file config))
-	(pid-file (i2pd-configuration-pid-file config))
-	(log-file (i2pd-configuration-log-file config))
-	(tunnels-config-file (i2pd-configuration-tunnels-config-file config))
-	(tunnels-directory (i2pd-configuration-tunnels-directory config)))
+        (config-file (i2pd-configuration-config-file config))
+        (pid-file (i2pd-configuration-pid-file config))
+        (log-file (i2pd-configuration-log-file config))
+        (tunnels-config-file (i2pd-configuration-tunnels-config-file config))
+        (tunnels-directory (i2pd-configuration-tunnels-directory config)))
 
     (list (shepherd-service
-	   (documentation "Run the I2pd daemon.")
+           (documentation "Run the I2pd daemon.")
            (provision '(i2pd))
-	   (requirement '(user-processes loopback syslogd))
-	   (actions (list shepherd-set-http-proxy-action))
+           (requirement '(user-processes loopback syslogd))
            (start #~(make-forkexec-constructor
-		      (list #$(file-append i2pd "/bin/i2pd")
-			    (string-append "--conf=" #$config-file)
-			    (string-append "--tunconf=" #$tunnels-config-file)
-			    (string-append "--tunnelsdir=" #$tunnels-directory)
-			    (string-append "--pidfile=" #$pid-file)
-			    (string-append "--logfile=" #$log-file)
-			    "--daemon"
-			    "--service")
-			    #:user "i2pd"
-			    #:group "i2pd"
-			    #:pid-file #$pid-file
-			    #:log-file #$log-file))
+                     (list #$(file-append
+                              i2pd
+                              "/bin/i2pd")
+                           (string-append
+                            "--conf="
+                            #$config-file)
+                           (string-append
+                            "--tunconf="
+                            #$tunnels-config-file)
+                           (string-append
+                            "--tunnelsdir="
+                            #$tunnels-directory)
+                           (string-append
+                            "--pidfile="
+                            #$pid-file)
+                           (string-append
+                            "--logfile="
+                            #$log-file)
+                           "--daemon"
+                           "--service")
+                     #:user "i2pd"
+                     #:group "i2pd"
+                     #:pid-file #$pid-file
+                     #:log-file #$log-file))
            (stop #~(make-kill-destructor))))))
 
 (define (i2pd-activation config)
@@ -132,65 +115,69 @@ keys = socks-keys.dat")))
         (tunnels-directory (i2pd-configuration-tunnels-directory config)))
 
     (with-imported-modules '((guix build utils))
-      (let ((lib-dir "/var/lib/i2pd")
-            (run-dir "/var/run/i2pd")
-            (log-dir "/var/log/i2pd/")
-            (etc-dir "/etc/i2pd")
-            (i2pd.conf "/etc/i2pd/i2pd.conf")
-            (tunnels.conf "/etc/i2pd/tunnels.conf"))
+                           (let ((lib-dir "/var/lib/i2pd")
+                                 (run-dir "/var/run/i2pd")
+                                 (log-dir "/var/log/i2pd/")
+                                 (etc-dir "/etc/i2pd")
+                                 (i2pd.conf "/etc/i2pd/i2pd.conf")
+                                 (tunnels.conf "/etc/i2pd/tunnels.conf"))
 
-	#~(begin
-            (use-modules (guix build utils))
+                             #~(begin
+                                 (use-modules (guix build utils))
 
-            (define %user
-              (getpw "i2pd"))
+                                 (define %user
+                                   (getpw "i2pd"))
 
-            ;; Make etc directory to write its CONFIG file.
-            (mkdir-p #$etc-dir)
-            (chown #$etc-dir
-                   (passwd:uid %user)
-                   (passwd:gid %user))
-            (chmod #$etc-dir #o755)
+                                 ;; Make etc directory to write its CONFIG file.
+                                 (mkdir-p #$etc-dir)
+                                 (chown #$etc-dir
+                                        (passwd:uid %user)
+                                        (passwd:gid %user))
+                                 (chmod #$etc-dir #o755)
 
-            (mkdir-p #$tunnels-directory)
-            (chown #$tunnels-directory
-                   (passwd:uid %user)
-                   (passwd:gid %user))
-            (chmod #$tunnels-directory #o755)
+                                 (mkdir-p #$tunnels-directory)
+                                 (chown #$tunnels-directory
+                                        (passwd:uid %user)
+                                        (passwd:gid %user))
+                                 (chmod #$tunnels-directory #o755)
 
-            ;; Allow I2pd to write its PID file.
-            (mkdir-p #$run-dir)
-            (chown #$run-dir
-                   (passwd:uid %user)
-                   (passwd:gid %user))
-            (chmod #$run-dir #o750)
+                                 ;; Allow I2pd to write its PID file.
+                                 (mkdir-p #$run-dir)
+                                 (chown #$run-dir
+                                        (passwd:uid %user)
+                                        (passwd:gid %user))
+                                 (chmod #$run-dir #o750)
 
-            ;; Allow I2pd to write its Log file.
-            (mkdir-p #$log-dir)
-            (chown #$log-dir
-                   (passwd:uid %user)
-                   (passwd:gid %user))
-            (chmod #$log-dir #o750)
+                                 ;; Allow I2pd to write its Log file.
+                                 (mkdir-p #$log-dir)
+                                 (chown #$log-dir
+                                        (passwd:uid %user)
+                                        (passwd:gid %user))
+                                 (chmod #$log-dir #o750)
 
-            ;; Allow I2pd to access the hidden services' directories.
-            (mkdir-p #$lib-dir)
-            (chown #$lib-dir
-                   (passwd:uid %user)
-                   (passwd:gid %user))
-            (chmod #$lib-dir #o750)
-            (chmod "/var/lib" #o755)
+                                 ;; Allow I2pd to access the hidden services' directories.
+                                 (mkdir-p #$lib-dir)
+                                 (chown #$lib-dir
+                                        (passwd:uid %user)
+                                        (passwd:gid %user))
+                                 (chmod #$lib-dir #o750)
+                                 (chmod "/var/lib" #o755)
 
-            ;; Copy file to CONFIG file
-            (copy-file #$config-file #$i2pd.conf)
-            (copy-file #$tunnels-config-file #$tunnels.conf))))))
+                                 ;; Copy file to CONFIG file
+                                 (copy-file #$config-file
+                                            #$i2pd.conf)
+                                 (copy-file #$tunnels-config-file
+                                            #$tunnels.conf))))))
 
 (define i2pd-service-type
   (service-type (name 'i2pd)
-                (extensions (list (service-extension shepherd-root-service-type
-						     i2pd-shepherd-service)
+                (extensions (list (service-extension
+                                   shepherd-root-service-type
+                                   i2pd-shepherd-service)
                                   (service-extension account-service-type
-						     (const %i2pd-accounts))
+                                                     (const %i2pd-accounts))
                                   (service-extension activation-service-type
                                                      i2pd-activation)))
-                (description "Run the @uref{https://i2pd.website, I2pd} anonymous networking daemon")
+                (description
+                 "Run the @uref{https://i2pd.website, I2pd} anonymous networking daemon")
                 (default-value (i2pd-configuration))))

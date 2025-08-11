@@ -80,7 +80,7 @@
                  (service spice-vdagent-service-type)
                  (service containerd-service-type)
                  (service docker-service-type)
-		 (service i2pd-service-type)
+                 (service i2pd-service-type)
                  (service tor-service-type
                           (tor-configuration (socks-socket-type 'tcp)
                                              (config-file (local-file
@@ -96,9 +96,10 @@
                           (libvirt-configuration (unix-sock-group "libvirt")
                                                  (tls-port "16555")))
                  (service qemu-binfmt-service-type
-                          (qemu-binfmt-configuration (platforms (lookup-qemu-platforms
-                                                                 "arm"
-                                                                 "aarch64"))))
+                          (qemu-binfmt-configuration
+                           (platforms
+                            (lookup-qemu-platforms "arm" "aarch64"))))
+
                  (service virtlog-service-type
                           (virtlog-configuration (max-clients 1000)))
                  (service hurd-vm-service-type

@@ -8,6 +8,7 @@
 
 # License
 
+Copyright © 2025 Stalk Evolto
 Released under the [GPLv3 License](https://www.gnu.org/licenses/quick-guide-gplv3.html) unless otherwise specified by license files in subfolders.
 
 # Mailing List

@@ -26,38 +26,38 @@
 
 (define childhurd-os
   (operating-system
-    (inherit %hurd-default-operating-system)
-    (kernel %hurd-default-operating-system-kernel)
-    (host-name "childhurd")
-    (timezone "Asia/Shanghai")
-    (locale "en_US.utf8")
-    (keyboard-layout (keyboard-layout "us"))
-    (file-systems %base-file-systems)
-    (bootloader (bootloader-configuration
-		 (bootloader grub-minimal-bootloader)
-		 (targets '("/dev/vda"))
-		 (timeout 0)))
+   (inherit %hurd-default-operating-system)
+   (kernel %hurd-default-operating-system-kernel)
+   (host-name "childhurd")
+   (timezone "Asia/Shanghai")
+   (locale "en_US.utf8")
+   (keyboard-layout (keyboard-layout "us"))
+   (file-systems %base-file-systems)
+   (bootloader (bootloader-configuration
+                (bootloader grub-minimal-bootloader)
+                (targets '("/dev/vda"))
+                (timeout 0)))
 
-    ;; Add a user account.
-    (users (cons* (user-account
-                   (name "stalk")
-                   (comment "Stalk's hurd")
-                   (group "users")
-                   (supplementary-groups '("wheel"))) %base-user-accounts))
+   ;; Add a user account.
+   (users (cons* (user-account
+                  (name "stalk")
+                  (comment "Stalk's hurd")
+                  (group "users")
+                  (supplementary-groups '("wheel"))) %base-user-accounts))
 
-    (packages (cons* (operating-system-packages
-                      %hurd-default-operating-system)))
+   (packages (cons* (operating-system-packages
+                     %hurd-default-operating-system)))
 
-    (services
-     (modify-services (operating-system-user-services
-                       %hurd-vm-operating-system)
-       (openssh-service-type config =>
-	(openssh-configuration
-	 (permit-root-login #t)
-	  (authorized-keys
-	   `(("root"
-	      ,(local-file
-		"/root/.ssh/id_ed25519_childhurd.pub"))
-	     ("stalk"
-	      ,(local-file
-		"/home/stalk/.ssh/id_ed25519.pub"))))))))))
+   (services
+    (modify-services (operating-system-user-services
+                      %hurd-vm-operating-system)
+                     (openssh-service-type config =>
+                                           (openssh-configuration
+                                            (permit-root-login #t)
+                                            (authorized-keys
+                                             `(("root"
+                                                ,(local-file
+                                                  "/root/.ssh/id_ed25519_childhurd.pub"))
+                                               ("stalk"
+                                                ,(local-file
+                                                  "/home/stalk/.ssh/id_ed25519.pub"))))))))))
