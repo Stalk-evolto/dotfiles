@@ -56,7 +56,14 @@
 
 (define %emacs-for-python
   (list "python"
-        "python-pylint"))
+        "python-autopep8"
+        "python-black"
+        "python-flake8"
+        "python-jedi"
+        "python-pylint"
+        "python-scapy"
+        "python-virtualenv"
+        "python-yapf"))
 
 (define %emacs-for-latex
   (list "calc"
@@ -65,6 +72,12 @@
         "texlive-latexmk"
         "texlive-chktex"
         "texlive-digestif"))
+
+(define %hack-tools
+  (list "nmap"
+        "hydra"
+        "wireshark"
+        "tcpdump"))
 
 (home-environment
  ;; Below is the list of packages that will show up in your
@@ -86,6 +99,7 @@
      "kdenlive"
      "libreoffice"
      "make"
+     "mariadb"
      "obs"
      "pinentry"
      "virt-manager"
@@ -96,7 +110,8 @@
     %emacs-for-guix
     %emacs-for-c
     %emacs-for-python
-    %emacs-for-latex)))
+    %emacs-for-latex
+    %hack-tools)))
 
  ;; Below is the list of Home services.  To search for available
  ;; services, run 'guix home search KEYWORD' in a terminal.
@@ -123,6 +138,7 @@
                  ("GTK_IM_MODULE" . "ibus")
                  ("QT_IM_MODULE" . "ibus")
                  ("XMODIFILERS" . "@im=ibus")
+                 ("PATH" . "$HOME/.local/bin:$PATH")
                  ))))
 
     ;; GNU Readline Package CONFIG file .inputrc
