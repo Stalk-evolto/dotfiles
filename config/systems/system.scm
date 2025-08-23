@@ -41,6 +41,8 @@
                      cups
                      databases
                      desktop
+                     dns
+                     messaging
                      networking
                      ssh
                      xorg
@@ -87,6 +89,13 @@
               (password-authentication? #f)
               (subsystems
                `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))))
+    (service pounce-service-type
+             (pounce-configuration
+              (host "irc.libera.chat")
+              (client-cert "/etc/pounce/libera.pem")
+              (sasl-external? #t)
+              (nick "stalk")
+              (join (list "#gnu" "#guix" "#guile" "#hurd"))))
     (service spice-vdagent-service-type)
     (service containerd-service-type)
     (service docker-service-type)
@@ -123,21 +132,30 @@
 ;; }
 ;; "))))
 
-    (service i2pd-service-type)
+    (service i2pd-service-type
+             (i2pd-configuration
+              (config-file (plain-file "i2pd.conf" "\
+ipv6 = true
+"))
+              (tunnels-config-file (plain-file "tunnels.conf" "\
+[alt-socks]
+type = socks
+address = 127.0.0.1
+port = 14447
+keys = socks-keys.dat
+
+[IRC2]
+type = client
+address = 127.0.0.1
+port = 6669
+destination = irc.ilita.i2p
+destinationport = 6667
+#keys = irc-client-key.dat"))))
     (service tor-service-type
              (tor-configuration
               (socks-socket-type 'tcp)
               (config-file (local-file
-                            "/etc/tor/torrc"))
-              (transport-plugins
-               (list
-                (tor-transport-plugin
-                 (protocol
-                  "meek_lite,obfs2,obfs3,obfs4,scramblesuit,webtunnel")
-                 (program
-                  (file-append
-                   lyrebird
-                   "/bin/lyrebird")))))))
+                            "/etc/tor/torrc"))))
     (service libvirt-service-type
              (libvirt-configuration (unix-sock-group "libvirt")
                                     (tls-port "16555")))

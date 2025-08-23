@@ -44,8 +44,8 @@
   (log-file i2pd-configuration-log-file
             (default "/var/log/i2pd/i2pd.log"))
   (tunnels-config-file i2pd-configuration-tunnels-config-file
-                       (default (plain-file "tunnels.conf"
-                                            "[alt-socks]
+                       (default (plain-file "tunnels.conf" "\
+[alt-socks]
 type = socks
 address = 127.0.0.1
 port = 14447
@@ -99,7 +99,7 @@ keys = socks-keys.dat")))
                            (string-append
                             "--logfile="
                             #$log-file)
-                           "--daemon"
+                           "--loglevel=info"
                            "--service")
                      #:user "i2pd"
                      #:group "i2pd"

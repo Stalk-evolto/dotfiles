@@ -31,6 +31,7 @@
   #:use-module (gnu home services shells)
   #:use-module (gnu home services ssh)
   #:use-module (gnu home services dotfiles)
+  #:use-module (gnu home services messaging)
   #:use-module (gnu system shadow)
   #:use-module (config home services home-channels)
   #:use-module (guix gexp)
@@ -180,7 +181,7 @@
                       (forward-agent? #t)
                       (identity-file "/home/stalk/.ssh/id_ed25519"))))))
 
-    ;; Channels append nonguix
+    ;; Channels append nonguix.
     channels-append-service
 
     ;; Backup my CONFIG file to dotfiles/files.
@@ -191,5 +192,10 @@
                           ".*\\.swp"
                           "\\.git"
                           "\\.gitignore"
-                          "\\.bash.*")))))
+                          "\\.bash.*"))))
+
+    ;; ZNC IRC bouncer.
+    ;; Start service befor use `znc --makeconf`.
+    (service home-znc-service-type))
+
    %base-home-services)))
