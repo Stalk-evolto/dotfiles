@@ -1,3 +1,0 @@
-[submodule "emacs-config"]
-	path = files/.emacs.d
-	url = git@github.com:Stalk-evolto/prelude.git
