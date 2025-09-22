@@ -1,4 +1,4 @@
-;;; home-config --- Functional home configuration for GNU Guix.
+;;; root-home-config --- Functional home configuration for GNU Guix.
 ;;; Copyright © 2025 Stalk Evolto <stalk-evolto@outlook.com>
 ;;;
 ;;; This file is part of GNU Guix.
@@ -23,15 +23,13 @@
 ;; need to capture the channels being used, as returned by "guix describe".
 ;; See the "Replicating Guix" section in the manual.
 
-(define-module (config home home-config)
+(define-module (config home root-home-config)
   #:use-module (gnu packages)
   #:use-module (gnu services)
   #:use-module (gnu home)
   #:use-module (gnu home services)
   #:use-module (gnu home services shells)
   #:use-module (gnu home services ssh)
-  #:use-module (gnu home services dotfiles)
-  #:use-module (gnu home services messaging)
   #:use-module (gnu system shadow)
   #:use-module (config home services home-channels)
   #:use-module (guix gexp)
@@ -43,6 +41,7 @@
         "aspell-dict-en"
         "emacs"
         "emacs-debbugs"
+        "emacs-monokai-theme"
         "git"
         "ripgrep"
         ))
@@ -55,35 +54,6 @@
 (define %emacs-for-c
   (list "gcc-toolchain"))
 
-(define %emacs-for-python
-  (list "python"
-        "python-autopep8"
-        "python-black"
-        "python-flake8"
-        "python-jedi"
-        "python-pylint"
-        "python-scapy"
-        "python-virtualenv"
-        "python-yapf"))
-
-(define %emacs-for-latex
-  (list "calc"
-        "rubber"
-        "texlive"
-        "texlive-latexmk"
-        "texlive-chktex"
-        "texlive-digestif"))
-
-(define %emacs-for-texinfo
-  (list "texinfo"
-        "texi2html"))
-
-(define %hack-tools
-  (list "nmap"
-        "hydra"
-        "wireshark"
-        "tcpdump"))
-
 (home-environment
  ;; Below is the list of packages that will show up in your
  ;; Home profile, under ~/.guix-home/profile.
@@ -91,33 +61,15 @@
   (specifications->packages
    (append
     (list
-     "docker-cli"
-     "firefox"
-     "font-adobe-source-han-sans:cn"
-     "font-wqy-microhei"
-     "fontconfig"
-     "gimp"
      "gnupg"
      "go"
-     "i2pd"
-     "icedove"
-     "kdenlive"
-     "libreoffice"
      "make"
-     "mariadb"
-     "obs"
-     "pinentry"
-     "virt-manager"
-     "virt-viewer"
-     "vlc"
-     "rust")
+     "openssl"
+     "rust"
+     "docker-cli")
     %emacs-base-packages
     %emacs-for-guix
-    %emacs-for-c
-    %emacs-for-python
-    %emacs-for-latex
-    %emacs-for-texinfo
-    %hack-tools)))
+    %emacs-for-c)))
 
  ;; Below is the list of Home services.  To search for available
  ;; services, run 'guix home search KEYWORD' in a terminal.
@@ -135,15 +87,14 @@
                          ("ip" . "ip -color=auto")
                          ("ll" . "ls -l")
                          ("ls" . "ls -p --color=auto")))
-              (bashrc (list (local-file "../../files/.bashrc"
-                                        "bashrc")))
-              (bash-profile (list (local-file "../../files/.bash_profile"
-                                              "bash_profile")))
+              (bash-profile
+               (list (plain-file "root_bash_profile" "\
+GUIX_PROFILE=$HOME/.config/guix/current
+. $GUIX_PROFILE/etc/profile
+")))
               (environment-variables
                `(
-                 ("GTK_IM_MODULE" . "ibus")
-                 ("QT_IM_MODULE" . "ibus")
-                 ("XMODIFILERS" . "@im=ibus")
+                 ("XDG_CACHE_HOME" . "/root/.cache")
                  ("PATH" . "$HOME/.local/bin:$PATH")
                  ))))
 
@@ -175,32 +126,14 @@
              (home-openssh-configuration
               (hosts
                (list (openssh-host
-                      (name "github.com")
-                      (forward-agent? #t)
-                      (identity-file "/home/stalk/.ssh/id_ed25519"))
-                     (openssh-host
                       (name "childhurd")
                       (host-name "localhost")
-                      (user "stalk")
+                      (user "root")
                       (port 10022)
                       (forward-agent? #t)
-                      (identity-file "/home/stalk/.ssh/id_ed25519"))))))
+                      (identity-file "/root/.ssh/id_ed25519_childhurd"))))))
 
     ;; Channels append nonguix.
-    channels-append-service
-
-    ;; Backup my CONFIG file to dotfiles/files.
-    (service home-dotfiles-service-type
-             (home-dotfiles-configuration
-              (directories '("../../files"))
-              (excluded '(".*~"
-                          ".*\\.swp"
-                          "\\.git"
-                          "\\.gitignore"
-                          "\\.bash.*"))))
-
-    ;; ZNC IRC bouncer.
-    ;; Start service befor use `znc --makeconf`.
-    (service home-znc-service-type))
+    channels-append-service)
 
    %base-home-services)))

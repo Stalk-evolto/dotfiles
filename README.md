@@ -6,6 +6,33 @@
 
 我使用的是 GNU Guix 发行版，内核为 GNU/Linux。
 
+# Installation
+
+1. clone储存库
+
+```shell
+git clone https://github.com/Stalk-evolto/dotfiles.git $HOME/dotfiles
+```
+
+2. clone子仓库
+
+```shell
+git submodule init
+git submodule update
+```
+
+3. 使用`guix system`重新配置系统
+
+```shell
+guix system reconfigure -L $HOME/dotfiles $HOME/dotfiles/config/systems/system.scm
+```
+
+4. 使用`guix home`重新配置用户home
+
+```shell
+guix home reconfigure -L $HOME/dotfiles $HOME/dotfiles/config/home/home-config.scm
+```
+
 # License
 
 Copyright © 2025 Stalk Evolto

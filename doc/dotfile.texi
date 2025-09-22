@@ -1,0 +1,140 @@
+\input texinfo
+@c -*-texinfo-*-
+
+@c %**start of header
+@setfilename dotfile.info
+@documentencoding UTF-8
+@settitle Stalk Evolto's Guix Dotfiles
+@c %**end of header
+
+
+@copying
+Copyright @copyright{} 2025 Stalk Evolto@*
+
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.3 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.  A
+copy of the license is included in the section entitled ``GNU Free
+Documentation License''.
+@end copying
+
+@titlepage
+@title GNU Guix Dotfiles
+@author Stalk Evolto
+
+@page
+@vskip 0pt plus 1filll
+
+@insertcopying
+@end titlepage
+
+@contents
+
+@c *********************************************************************
+@node Top, 简介, (dir), (dir)
+@top GNU Guix Dotfiles
+
+这篇文档是 GNU Guix version 的 dotfile 配置教程。
+
+@menu
+* 简介::                        为什么使用 Guix?
+* 安装::                        在 Guix 发行版上使用 Stalk Evolto 的 dotfiles 配置系统.
+* 参考::                        dotfiles定义的拓展内容参考.
+* GNU 自由文档许可证::
+* Concept Index::
+* Programming Index::
+@end menu
+
+@c *********************************************************************
+@node 简介, 安装, Top, Top
+@chapter 简介
+
+Guix 是一个函数式包管理器，能够使用 Scheme 语言将其拓展配置，在 Guix 发行版上可以使用 guix system 定制你的系统，以及使用 guix home 保存用户配置。配置过程也不用担心损坏系统，上述命令拥有 container 参数可以创建隔离的一次性容器检验你你的配置，还可以使用 switch-generation 或者 roll-back (与 switch-generation -1 同效）回滚系统。使用 Scheme 可以轻松定义软件包以及服务，还能使用 @command{guix shell} 创建虚拟环境测试你的程序，不损坏系统环境。依赖项在相对隔离的 @file{/gnu/store} 目录下，通过符号链接使用，使得配置自己的个人电脑变得简单且易于维护。
+
+@node 安装, 参考, 简介, Top
+@chapter 安装
+
+@menu
+* Guix 安装::
+* 使用 dotfiles 配置系统::
+@end menu
+
+@node Guix 安装, 使用 dotfiles 配置系统, 安装, 安装
+@section Guix 安装
+
+安装 Guix 可以参考 @uref{https://guix.gnu.org/manual/devel/en/html_node/Installation.html, Guix 官方文档}。
+
+由于 Guix 是自由软件操作系统发行版，笔记本用户安装 Guix 系统，可能会遇到无线网卡没有自由驱动，导致无法联网。
+@quotation
+在电脑安装活动中应该向公众推荐或者该为公众安装什么样的发行版呢？从道义上看，安装活动不应该推荐或安装非自由程序。然而，人们带来的电脑需要非自由的驱动或固件才能运行——没有这些程序，他们会失望而去，并认为 GNU/Linux 不行。
+
+我们为此想了一个平衡两方的点子：安装活动安装一个自由的发行版，然后 “魔鬼”（带有魔鬼面具的人）安装必要的非自由驱动或固件。
+@author Free Software Foundation
+@end quotation
+
+为此我们在笔记本电脑上安装 Guix 操作系统，需要额外安装非自由驱动，而安装通道可以选择 @uref{https://gitlab.com/nonguix/nonguix， nonguix}。
+
+安装方法可以参考 @uref{https://wiki.systemcrafters.net/guix/nonguix-installation-guide, nonguix 安装指南}
+
+@node 使用 dotfiles 配置系统,  , Guix 安装, 安装
+@section 使用 dotfiles 配置系统
+
+如果你没有自己的 dotfiles，可以先使用 Stalk Evolto 的 dotfiles。
+
+@enumerate
+@item
+clone 储存库
+
+@example
+git clone https://github.com/Stalk-evolto/dotfiles.git $HOME/dotfiles
+cd $HOME/dotfiles
+@end example
+
+@item
+更新子仓库
+
+@example
+git submodule init
+git submodule update
+@end example
+
+@item
+重新构建系统
+
+@example
+guix system reconfigure -L $HOME/dotfiles $HOME/dotfiles/config/systems/system.scm
+@end example
+
+@item
+重新配置 home 目录
+
+@example
+guix home reconfigure -L $HOME/dotfiles $HOME/dotfiles/home/home-config.scm
+@end example
+@end enumerate
+
+即可将你的系统配置的与 Stalk 的 Guix 工作环境一样了。
+
+@c *********************************************************************
+@node 参考, GNU 自由文档许可证, 安装, Top
+@chapter 参考
+
+@c *********************************************************************
+@node GNU 自由文档许可证, Concept Index, 参考, Top
+@appendix GNU 自由文档许可证
+@cindex license, GNU Free Documentation License
+@include fdl-1.3.texi
+
+@c *********************************************************************
+@node Concept Index, Programming Index, GNU 自由文档许可证, Top
+@unnumbered Concept Index
+@printindex cp
+
+@node Programming Index,  , Concept Index, Top
+@unnumbered Programming Index
+@syncodeindex tp fn
+@syncodeindex vr fn
+@printindex fn
+
+@bye

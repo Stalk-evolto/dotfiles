@@ -79,7 +79,7 @@
  (services
   (append
    (list
-    (service gnome-desktop-service-type)
+    ;; (service gnome-desktop-service-type)
 
     ;; To configure OpenSSH, pass an 'openssh-configuration'
     ;; record as a second argument to 'service' below.
