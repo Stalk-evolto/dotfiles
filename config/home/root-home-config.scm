@@ -86,10 +86,11 @@
               (aliases '(("grep" . "grep --color=auto")
                          ("ip" . "ip -color=auto")
                          ("ll" . "ls -l")
-                         ("ls" . "ls -p --color=auto")))
+                         ("ls" . "ls -p --color=auto")
+			 ("update-system" . "guix system reconfigure -L /home/stalk/dotfiles /home/stalk/dotfiles/config/systems/system.scm")))
               (bash-profile
                (list (plain-file "root_bash_profile" "\
-GUIX_PROFILE=$HOME/.config/guix/current
+GUIX_PROFILE=$HOME/.guix-profile
 . $GUIX_PROFILE/etc/profile
 ")))
               (environment-variables

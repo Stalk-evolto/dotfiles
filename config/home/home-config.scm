@@ -57,10 +57,12 @@
 
 (define %emacs-for-python
   (list "python"
-        "python-autopep8"
+        ;; "python-autopep8"
         "python-black"
         "python-flake8"
         "python-jedi"
+        "python-pycodestyle"
+        "python-pytest-pycodestyle"
         "python-pylint"
         "python-scapy"
         "python-virtualenv"
@@ -101,6 +103,7 @@
      "go"
      "i2pd"
      "icedove"
+     "jami"
      "kdenlive"
      "libreoffice"
      "make"
@@ -134,13 +137,16 @@
               (aliases '(("grep" . "grep --color=auto")
                          ("ip" . "ip -color=auto")
                          ("ll" . "ls -l")
-                         ("ls" . "ls -p --color=auto")))
+                         ("ls" . "ls -p --color=auto")
+                         ("update-home" . "guix home reconfigure -L $HOME/dotfiles $HOME/dotfiles/config/home/home-config.scm")))
               (bashrc (list (local-file "../../files/.bashrc"
                                         "bashrc")))
               (bash-profile (list (local-file "../../files/.bash_profile"
                                               "bash_profile")))
               (environment-variables
                `(
+                 ("VISUAL" . "emacs")
+                 ("EDITOR" . "$VISUAL")
                  ("GTK_IM_MODULE" . "ibus")
                  ("QT_IM_MODULE" . "ibus")
                  ("XMODIFILERS" . "@im=ibus")

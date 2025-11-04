@@ -21,13 +21,27 @@ git submodule init
 git submodule update
 ```
 
-3. 使用`guix system`重新配置系统
+3. 检查clone的仓库是否为正版
+
+```shell
+git fetch origin keyring:keyring
+guix git authenticate cbc970677a439191b59d4787823ff447a154c45d \
+  "1903 4003 F817 AABF AA97  0070 7303 8079 9D2B CDD0"
+```
+
+如果成功，终端会有如下显示
+
+```shell
+guix git: successfully authenticated commit cbc970677a439191b59d4787823ff447a154c45d
+```
+
+4. 使用`guix system`重新配置系统
 
 ```shell
 guix system reconfigure -L $HOME/dotfiles $HOME/dotfiles/config/systems/system.scm
 ```
 
-4. 使用`guix home`重新配置用户home
+5. 使用`guix home`重新配置用户home
 
 ```shell
 guix home reconfigure -L $HOME/dotfiles $HOME/dotfiles/config/home/home-config.scm

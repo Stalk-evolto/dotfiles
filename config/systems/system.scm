@@ -30,27 +30,36 @@
 (define-module (config systems system)
   #:use-module (gnu)
   #:use-module (gnu packages)
+  #:use-module (guix packages)
   #:use-module (nongnu packages linux)
-  #:use-module (gnu packages golang-web)
-  #:use-module (gnu packages ssh)
-  #:use-module (gnu packages databases)
   #:use-module (config systems hurd)
-  #:use-module (config services i2pd))
+  #:use-module (config services i2pd)
+  #:use-module (config packages tor-pluggable)
+  )
+(use-modules (config systems base-system))
+(use-package-modules databases
+                     golang-web
+                     ssh
+                     xml)
 
-(use-service-modules base
+(use-service-modules admin
                      cups
                      databases
                      desktop
                      dns
-                     messaging
-                     networking
-                     ssh
-                     xorg
-                     spice
                      docker
-                     virtualization)
+                     messaging
+                     monitoring
+                     networking
+                     spice
+                     ssh
+                     telephony
+                     virtualization
+                     xorg
+                     base)
 
 (operating-system
+ (inherit base-system)
  (kernel linux)
  (firmware (list linux-firmware))
  (locale "en_US.utf8")
@@ -70,16 +79,16 @@
  ;; Packages installed system-wide.  Users can also install packages
  ;; under their own account: use 'guix search KEYWORD' to search
  ;; for packages and 'guix install PACKAGE' to install a package.
- (packages (append (map specification->package
-                        '("font-wqy-zenhei" "font-gnu-unifont" "ibus"
-                          "ibus-libpinyin" "dconf" "git")) %base-packages))
+
 
  ;; Below is the list of system services.  To search for available
  ;; services, run 'guix system search KEYWORD' in a terminal.
  (services
   (append
    (list
-    ;; (service gnome-desktop-service-type)
+    (service gnome-desktop-service-type)
+    (service file-database-service-type)
+    (service package-database-service-type)
 
     ;; To configure OpenSSH, pass an 'openssh-configuration'
     ;; record as a second argument to 'service' below.
@@ -91,46 +100,56 @@
                `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))))
     (service pounce-service-type
              (pounce-configuration
+              (shepherd-requirement '(user-processes networking NetworkManager))
               (host "irc.libera.chat")
               (client-cert "/etc/pounce/libera.pem")
               (sasl-external? #t)
               (nick "stalk")
               (join (list "#gnu" "#guix" "#guile" "#hurd"))))
+    (service jami-service-type
+             (jami-configuration
+              (accounts
+               (list (jami-account
+                      (archive "/etc/jami/unencrypted-account-1.gz"))))))
     (service spice-vdagent-service-type)
     (service containerd-service-type)
     (service docker-service-type)
     (service mysql-service-type
              (mysql-configuration
-               (bind-address "0.0.0.0")
-               (extra-content
+              (bind-address "0.0.0.0")
+              (extra-content
                `(string-append "basedir=" ,mariadb))
-               (extra-environment #~'("HOSTNAME='stalk-evolto'"))
-               (auto-upgrade? #f)))
+              (extra-environment #~'("HOSTNAME='stalk-evolto'"))
+              (auto-upgrade? #f)))
     (service redis-service-type)
-;;     (service nftables-service-type
-;;              (nftables-configuration
-;;               (ruleset (plain-file "nftables.conf" "\
-;; # A Simple ruleset for a workstation
-;; table inet filter {
-;;   chain input {
-;;     type filter hook input priority 0; policy drop;
+    ;;     (service nftables-service-type
+    ;;              (nftables-configuration
+    ;;               (ruleset (plain-file "nftables.conf" "\
+    ;; # A Simple ruleset for a workstation
+    ;; table inet filter {
+    ;;   chain input {
+    ;;     type filter hook input priority 0; policy drop;
 
-;;     # accept any localhost traffic
-;;     iif lo accept
+    ;;     # accept any localhost traffic
+    ;;     iif lo accept
 
-;;     # accept traffic originated from us
-;;     ct state established,related accept
+    ;;     # accept traffic originated from us
+    ;;     ct state established,related accept
 
-;;     # accept neighbour discovery otherwise IPv6 connectivity breaks
-;;     icmpv6 type { nd-neighbor-solicit, nd-router-advert, nd-neighbor-advert } accept
+    ;;     # accept neighbour discovery otherwise IPv6 connectivity breaks
+    ;;     icmpv6 type { nd-neighbor-solicit, nd-router-advert, nd-neighbor-advert } accept
 
-;;     # Allow SSH on port TCP/22 and allow HTTP(s) TCP/80 and TCP/443
-;;     # for IPV4 and IPV6
-;;     tcp dport { 22, 80, 443 } accept
+    ;;     # Allow SSH on port TCP/22 and allow HTTP(s) TCP/80 and TCP/443
+    ;;     # for IPV4 and IPV6
+    ;;     tcp dport { 22, 80, 443 } accept
 
-;;    }
-;; }
-;; "))))
+    ;;    }
+    ;; }
+    ;; "))))
+
+    ;; (service darkstat-service-type
+    ;;          (darkstat-configuration
+    ;;           (interface "wlo1")))
 
     (service i2pd-service-type
              (i2pd-configuration
@@ -151,11 +170,20 @@ port = 6669
 destination = irc.ilita.i2p
 destinationport = 6667
 #keys = irc-client-key.dat"))))
+
     (service tor-service-type
              (tor-configuration
               (socks-socket-type 'tcp)
               (config-file (local-file
-                            "/etc/tor/torrc"))))
+                            "/etc/tor/torrc"))
+              (transport-plugins
+               (list (tor-transport-plugin
+                      (protocol "webtunnel")
+                      (program (file-append webtunnel "/bin/client")))
+                     (tor-transport-plugin
+                      (protocol "obfs4")
+                      (program (file-append lyrebird "/bin/lyrebird")))))))
+
     (service libvirt-service-type
              (libvirt-configuration (unix-sock-group "libvirt")
                                     (tls-port "16555")))
@@ -176,30 +204,43 @@ destinationport = 6667
 
    ;; This is the default list of services
    ;; we are appending to.
-   (modify-services %desktop-services)))
+   (modify-services %desktop-services
+            (guix-service-type config => (guix-configuration
+                (inherit config)
+                (substitute-urls
+                 (append (list "https://substitutes.nonguix.org")
+                         %default-substitute-urls))
+                (authorized-keys
+                 (append (list (plain-file "signing-key.pub" "\
+(public-key
+        (ecc
+                (curve Ed25519)
+                (q #C1FD53E5D4CE971933EC50C9F307AE2171A2D3B52C804642A7A35F84F3A4EA98#)
+        )
+)
+"))
+                %default-authorized-guix-keys)))))))
 
  (bootloader (bootloader-configuration
               (bootloader grub-efi-bootloader)
               (targets (list "/boot/efi"))
               (keyboard-layout keyboard-layout)))
  (swap-devices (list (swap-space
-                      (target (uuid "0b2df261-f1cb-4577-820d-a309e08913e0")))))
+                       (target (file-system-label "swap")))))
 
  ;; The list of file systems that get "mounted".  The unique
  ;; file system identifiers there ("UUIDs") can be obtained
  ;; by running 'blkid' in a terminal.
  (file-systems (cons* (file-system
                        (mount-point "/home")
-                       (device (uuid "40b7f246-48d0-4a13-b5d6-006df20d2fce"
-                                     'ext4))
+                       (device (file-system-label "my-home"))
                        (type "ext4"))
                       (file-system
                        (mount-point "/")
-                       (device (uuid "3aef86c9-3c3b-4fe0-9a43-e537abc6221a"
-                                     'ext4))
+                       (device (file-system-label "my-root"))
                        (type "ext4"))
                       (file-system
                        (mount-point "/boot/efi")
-                       (device (uuid "25E4-BEAB"
-                                     'fat32))
-                       (type "vfat")) %base-file-systems)))
+                       (device (uuid "25E4-BEAB" 'fat32))
+                       (type "vfat"))
+                      %base-file-systems)))
