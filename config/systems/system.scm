@@ -54,7 +54,9 @@
                      spice
                      ssh
                      telephony
+                     version-control
                      virtualization
+                     web
                      xorg
                      base)
 
@@ -98,6 +100,32 @@
               (password-authentication? #f)
               (subsystems
                `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))))
+    (service guix-publish-service-type
+             (guix-publish-configuration
+              (port 80)
+              (advertise? #t)
+              (cache "/var/cache/guix/publish")
+              (ttl 432000)))
+
+    (service git-daemon-service-type
+             (git-daemon-configuration
+              (export-all? #t)))
+    ;; (service nginx-service-type
+    ;;          (nginx-configuration
+    ;;           (server-blocks
+    ;;            (list
+    ;;             (nginx-server-configuration
+    ;;              (listen '("443 ssl"))
+    ;;              (server-name "git.stalk-evolto.org")
+    ;;              (ssl-certificate
+    ;;               "/etc/certs/git.stalk-evolto.org/fullchain.pem")
+    ;;              (ssl-certificate-key
+    ;;               "/etc/certs/git.stalk-evolto.org/privkey.pem")
+    ;;              (locations
+    ;;               (list
+    ;;                (git-http-nginx-location-configuration
+    ;;                 (git-http-configuration (uri-path "/"))))))))))
+
     (service pounce-service-type
              (pounce-configuration
               (shepherd-requirement '(user-processes networking NetworkManager))
@@ -207,6 +235,7 @@ destinationport = 6667
    (modify-services %desktop-services
             (guix-service-type config => (guix-configuration
                 (inherit config)
+                (discover? #t)
                 (substitute-urls
                  (append (list "https://substitutes.nonguix.org")
                          %default-substitute-urls))
