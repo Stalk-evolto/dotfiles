@@ -4,6 +4,7 @@
   #:use-module (guix git-download)
   #:use-module (guix records)
   #:use-module (gnu packages admin)
+  #:use-module (gnu services)
   #:use-module (gnu services shepherd)
   #:use-module (gnu services version-control)
   #:use-module (gnu system shadow)

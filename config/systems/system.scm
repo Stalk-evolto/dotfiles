@@ -31,11 +31,12 @@
   #:use-module (gnu)
   #:use-module (gnu packages)
   #:use-module (guix packages)
+  #:use-module (guix least-authority)
   #:use-module (nongnu packages linux)
   #:use-module (config systems hurd)
   #:use-module (config services i2pd)
-  #:use-module (config packages tor-pluggable)
-  )
+  #:use-module (config packages tor))
+
 (use-modules (config systems base-system))
 (use-package-modules databases
                      golang-web
@@ -82,7 +83,7 @@
  ;; under their own account: use 'guix search KEYWORD' to search
  ;; for packages and 'guix install PACKAGE' to install a package.
  (packages (append (map specification->package
-                        '("ibus" "ibus-rime" "dconf" "font-adobe-source-han-sans"))
+                        '("ibus" "ibus-rime" "ibus-libpinyin" "dconf" "font-adobe-source-han-sans"))
                    %base-packages))
 
  ;; Below is the list of system services.  To search for available
@@ -203,6 +204,7 @@ destinationport = 6667
 
     (service tor-service-type
              (tor-configuration
+              (tor tor-latest)
               (socks-socket-type 'tcp)
               (config-file (local-file
                             "/etc/tor/torrc"))

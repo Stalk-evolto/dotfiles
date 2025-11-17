@@ -33,7 +33,7 @@
   #:use-module (guix packages)
   #:use-module (nongnu packages linux)
   #:use-module (config services i2pd)
-  #:use-module (config packages tor-pluggable)
+  #:use-module (config packages tor)
   #:export (base-system))
 
 (use-package-modules databases
