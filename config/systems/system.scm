@@ -35,6 +35,7 @@
   #:use-module (nongnu packages linux)
   #:use-module (config systems hurd)
   #:use-module (config services i2pd)
+  #:use-module (config services auto-mirror)
   #:use-module (config packages tor))
 
 (use-modules (config systems base-system))
@@ -113,13 +114,16 @@
     (service git-daemon-service-type
              (git-daemon-configuration
               (export-all? #t)))
+    (service update-git-mirror-service-type)
+
+    ;; (service fcgiwrap-service-type)
     ;; (service nginx-service-type
     ;;          (nginx-configuration
     ;;           (server-blocks
     ;;            (list
     ;;             (nginx-server-configuration
     ;;              (listen '("443 ssl"))
-    ;;              (server-name "git.stalk-evolto.org")
+    ;;              (server-name "localhost:9418")
     ;;              (ssl-certificate
     ;;               "/etc/certs/git.stalk-evolto.org/fullchain.pem")
     ;;              (ssl-certificate-key
@@ -128,6 +132,7 @@
     ;;               (list
     ;;                (git-http-nginx-location-configuration
     ;;                 (git-http-configuration (uri-path "/"))))))))))
+    ;; (service certbot-service-type)
 
     (service pounce-service-type
              (pounce-configuration

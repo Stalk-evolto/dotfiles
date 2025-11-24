@@ -49,7 +49,9 @@
 (define %emacs-for-guix
   (list "emacs-geiser"
         "emacs-geiser-guile"
-        "guile"))
+        "guile"
+        "guile-readline"
+        "guile-colorized"))
 
 (define %emacs-for-c
   (list "gcc-toolchain"))
