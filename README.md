@@ -25,7 +25,7 @@ git submodule update
 
 ```shell
 git fetch origin keyring:keyring
-guix git authenticate cbc970677a439191b59d4787823ff447a154c45d \
+guix git authenticate 3bd01d5dd91c11595c28c9a3666f6a18869b4fe5 \
   "1903 4003 F817 AABF AA97  0070 7303 8079 9D2B CDD0"
 ```
 
