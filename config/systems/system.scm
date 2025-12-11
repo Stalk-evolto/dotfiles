@@ -33,10 +33,12 @@
   #:use-module (guix packages)
   #:use-module (guix least-authority)
   #:use-module (nongnu packages linux)
+  #:use-module (nongnu system linux-initrd)
   #:use-module (config systems hurd)
   #:use-module (config services i2pd)
   #:use-module (config services auto-mirror)
-  #:use-module (config packages tor))
+  #:use-module (config packages tor)
+  #:use-module (srfi srfi-19))
 
 (use-modules (config systems base-system))
 (use-package-modules databases
@@ -63,8 +65,9 @@
                      base)
 
 (operating-system
- (inherit base-system)
+ (inherit %base-system)
  (kernel linux)
+ (initrd microcode-initrd)
  (firmware (list linux-firmware))
  (locale "en_US.utf8")
  (timezone "Asia/Shanghai")
@@ -231,11 +234,25 @@ destinationport = 6667
 
     (service virtlog-service-type
              (virtlog-configuration (max-clients 1000)))
+
+    (service virtual-build-machine-service-type
+             (virtual-build-machine
+              (image %build-vm-machine-image)
+              (cpu "max")
+              (cpu-count 4)
+              (memory-size 4096)
+              (date (current-date))
+              (systems (list "x86_64-linux"))
+              (port-forwardings `((21022 . 22)
+                                  (21004 . 1004)))
+              (auto-start? #t)))
     (service hurd-vm-service-type
-             (hurd-vm-configuration (os childhurd-os)
+             (hurd-vm-configuration (os %childhurd-os)
                                     (disk-size (* 5000
                                                   (expt 2 20)))
-                                    (memory-size 1024)))
+                                    (memory-size 1024))
+             )
+
     (set-xorg-configuration
      (xorg-configuration (keyboard-layout keyboard-layout))))
 

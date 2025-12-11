@@ -19,12 +19,12 @@
 (define-module (config systems hurd)
   #:use-module (gnu)
   #:use-module (gnu system hurd)
-  #:export (childhurd-os))
+  #:export (%childhurd-os))
 
 (use-service-modules virtualization ssh)
-(use-package-modules hurd ssh)
+(use-package-modules hurd ssh emacs)
 
-(define childhurd-os
+(define %childhurd-os
   (operating-system
    (inherit %hurd-default-operating-system)
    (kernel %hurd-default-operating-system-kernel)

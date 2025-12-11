@@ -89,7 +89,7 @@
                          ("ip" . "ip -color=auto")
                          ("ll" . "ls -l")
                          ("ls" . "ls -p --color=auto")
-			 ("update-system" . "guix system reconfigure -L /home/stalk/dotfiles /home/stalk/dotfiles/config/systems/system.scm")))
+                         ("update-system" . "guix system reconfigure -L /home/stalk/dotfiles /home/stalk/dotfiles/config/systems/system.scm")))
               (bash-profile
                (list (plain-file "root_bash_profile" "\
 GUIX_PROFILE=$HOME/.guix-profile
@@ -129,12 +129,23 @@ GUIX_PROFILE=$HOME/.guix-profile
              (home-openssh-configuration
               (hosts
                (list (openssh-host
+                      (name "github.com")
+                      (forward-agent? #t)
+                      (identity-file "/home/stalk/.ssh/id_ed25519"))
+                     (openssh-host
                       (name "childhurd")
                       (host-name "localhost")
                       (user "root")
                       (port 10022)
                       (forward-agent? #t)
-                      (identity-file "/root/.ssh/id_ed25519_childhurd"))))))
+                      (identity-file "/root/.ssh/id_ed25519_childhurd"))
+                     (openssh-host
+                      (name "build-vm")
+                      (host-name "localhost")
+                      (user "root")
+                      (port 21022)
+                      (forward-agent? #t)
+                      (identity-file "/root/.ssh/id_ed25519_buildvm"))))))
 
     ;; Channels append nonguix.
     channels-append-service)

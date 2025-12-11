@@ -31,12 +31,19 @@
   #:use-module (gnu)
   #:use-module (gnu packages)
   #:use-module (guix packages)
-  #:use-module (nongnu packages linux)
+  #:use-module (gnu packages linux)
+  #:use-module (gnu image)
+  #:use-module (gnu system)
+  #:use-module (gnu system image)
   #:use-module (config services i2pd)
   #:use-module (config packages tor)
-  #:export (base-system))
+  #:use-module (ice-9 match)
+  #:export (%base-system
+            %build-vm-system
+            %build-vm-machine-image))
 
 (use-package-modules databases
+                     emacs
                      golang-web
                      ssh
                      xml)
@@ -52,24 +59,22 @@
                      xorg
                      base)
 
-(define base-system
+(define %base-system
   (operating-system
-    (kernel linux)
-    (firmware (list linux-firmware))
+   (kernel linux-libre)
+   (firmware %base-firmware)
     (locale "en_US.utf8")
     (timezone "Asia/Shanghai")
     (keyboard-layout (keyboard-layout "us"))
     (host-name "stalk-laptop")
 
     ;; The list of user accounts ('root' is implicit).
-    (users (cons* (user-account
-                    (name "stalk")
-                    (comment "Stalk")
-                    (group "users")
-                    (home-directory "/home/stalk")
-                    (supplementary-groups '("wheel" "netdev" "audio" "video"
-                                            "libvirt")))
-                  %base-user-accounts))
+    (users (cons (user-account
+                  (name "offload")
+                  (group "users")
+                  (supplementary-groups '("kvm"))
+                  (comment "Account used for offloading"))
+                 %base-user-accounts))
 
     ;; Packages installed system-wide.  Users can also install packages
     ;; under their own account: use 'guix search KEYWORD' to search
@@ -127,3 +132,42 @@
                                          'fat32))
                            (type "vfat"))
                          %base-file-systems))))
+
+(define %build-vm-system
+  (operating-system
+   (inherit %virtual-build-machine-operating-system)
+   (bootloader (bootloader-configuration         ;unused
+                (bootloader grub-minimal-bootloader)
+                (targets '("/dev/vda"))))
+   (file-systems %base-file-systems)
+   (packages (cons* (operating-system-packages
+                     %virtual-build-machine-operating-system)))
+   (services
+    (modify-services (operating-system-user-services
+                      %virtual-build-machine-operating-system)
+                     (openssh-service-type config =>
+                                           (openssh-configuration
+                                            (permit-root-login #t)
+                                            (authorized-keys
+                                             `(("root"
+                                                ,(local-file
+                                                  "/root/.ssh/id_ed25519_buildvm.pub"))))))))))
+
+(define %build-vm-machine-image
+  (let* ((type (lookup-image-type-by-name 'mbr-raw))
+         (base (os->image %build-vm-system
+                          #:type type)))
+    (image (inherit base)
+           (format 'compressed-qcow2)
+           (partition-table-type 'mbr)
+           (volatile-root? #f)
+           (shared-store? #f)
+           (size (* 20 (expt 2 30)))
+           (partitions (match (image-partitions base)
+                         ((root)
+                          ;; Increase the size of the root partition to match
+                          ;; that of the disk image.
+                          (let ((root-size (- size (* 50 (expt 2 20)))))
+                            (list (partition
+                                   (inherit root)
+                                   (size root-size))))))))))
