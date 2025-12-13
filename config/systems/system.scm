@@ -105,8 +105,12 @@
              (openssh-configuration
               (permit-root-login 'prohibit-password)
               (password-authentication? #f)
+              (accepted-environment '("COLORTERM"))
               (subsystems
-               `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))))
+               `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))
+              (authorized-keys
+               `(("stalk" ,(local-file "/home/stalk/keys/stalk.pub"))
+                 ("root" ,(local-file "/root/keys/stalk.pub"))))))
     (service guix-publish-service-type
              (guix-publish-configuration
               (port 80)
@@ -250,8 +254,7 @@ destinationport = 6667
              (hurd-vm-configuration (os %childhurd-os)
                                     (disk-size (* 5000
                                                   (expt 2 20)))
-                                    (memory-size 1024))
-             )
+                                    (memory-size 1024)))
 
     (set-xorg-configuration
      (xorg-configuration (keyboard-layout keyboard-layout))))
