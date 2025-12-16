@@ -49,6 +49,7 @@
 (define %emacs-for-guix
   (list "emacs-geiser"
         "emacs-geiser-guile"
+        "emacs-guix"
         "guile"
         "guile-readline"
         "guile-colorized"))

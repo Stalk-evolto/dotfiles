@@ -266,8 +266,9 @@ destinationport = 6667
                 (inherit config)
                 (discover? #t)
                 (substitute-urls
-                 (append (list "https://substitutes.nonguix.org")
-                         %default-substitute-urls))
+                 (list "https://4zwzi66wwdaalbhgnix55ea3ab4pvvw66ll2ow53kjub6se4q2bclcyd.onion"
+                       "https://bordeaux.guix.gnu.org"
+                       "https://substitutes.nonguix.org"))
                 (authorized-keys
                  (append (list (plain-file "signing-key.pub" "\
 (public-key

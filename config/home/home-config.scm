@@ -48,11 +48,13 @@
         ))
 
 (define %emacs-for-guix
-  (list "emacs-geiser"
+  (list "emacs-guix"
+        "emacs-geiser"
         "emacs-geiser-guile"
         "guile"
         "guile-readline"
-        "guile-colorized"))
+        "guile-colorized"
+        "guile-hall"))
 
 (define %emacs-for-c
   (list "gcc-toolchain"))
@@ -66,7 +68,7 @@
         "python-pycodestyle"
         "python-pytest-pycodestyle"
         "python-pylint"
-        "python-scapy"
+        "python-scrapy"
         "python-virtualenv"
         "python-yapf"))
 
