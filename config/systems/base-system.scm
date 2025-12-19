@@ -136,10 +136,15 @@
 (define %build-vm-system
   (operating-system
    (inherit %virtual-build-machine-operating-system)
+   (kernel linux-libre)
    (bootloader (bootloader-configuration         ;unused
                 (bootloader grub-minimal-bootloader)
-                (targets '("/dev/vda"))))
-   (file-systems %base-file-systems)
+                (targets '("/dev/null"))))
+   (file-systems (cons (file-system              ;unused
+                        (mount-point "/")
+                        (device "none")
+                        (type "tmpfs"))
+                       %base-file-systems))
    (packages (cons* (operating-system-packages
                      %virtual-build-machine-operating-system)))
    (services
@@ -147,6 +152,7 @@
                       %virtual-build-machine-operating-system)
                      (openssh-service-type config =>
                                            (openssh-configuration
+                                            (openssh openssh-sans-x)
                                             (permit-root-login #t)
                                             (authorized-keys
                                              `(("root"

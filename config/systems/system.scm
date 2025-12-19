@@ -243,18 +243,18 @@ destinationport = 6667
              (virtual-build-machine
               (image %build-vm-machine-image)
               (cpu "max")
-              (cpu-count 4)
+              (cpu-count 2)
               (memory-size 4096)
               (date (current-date))
               (systems (list "x86_64-linux"))
-              (port-forwardings `((21022 . 22)
+              (port-forwardings `((20022 . 22)
                                   (21004 . 1004)))
               (auto-start? #t)))
     (service hurd-vm-service-type
              (hurd-vm-configuration (os %childhurd-os)
                                     (disk-size (* 5000
                                                   (expt 2 20)))
-                                    (memory-size 1024)))
+                                    (memory-size 2048)))
 
     (set-xorg-configuration
      (xorg-configuration (keyboard-layout keyboard-layout))))
@@ -265,6 +265,7 @@ destinationport = 6667
             (guix-service-type config => (guix-configuration
                 (inherit config)
                 (discover? #t)
+                (http-proxy "http://localhost:8118")
                 (substitute-urls
                  (list "https://4zwzi66wwdaalbhgnix55ea3ab4pvvw66ll2ow53kjub6se4q2bclcyd.onion"
                        "https://bordeaux.guix.gnu.org"
