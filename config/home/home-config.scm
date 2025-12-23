@@ -72,17 +72,31 @@
         "python-virtualenv"
         "python-yapf"))
 
-(define %emacs-for-latex
-  (list "calc"
-        "rubber"
-        "texlive"
-        "texlive-latexmk"
-        "texlive-chktex"
-        "texlive-digestif"))
-
 (define %emacs-for-texinfo
-  (list "texinfo"
-        "texi2html"))
+  (list "calc"
+        "font-arphic-ukai"
+        "font-google-noto-serif-cjk"
+        "font-google-noto-serif-cjk-static"
+        "gettext"
+        "rubber"
+        "texi2html"
+        "texinfo"
+        "texlive-chinese-jfm"
+        "texlive-collection-langchinese"
+        "texlive-digestif"
+        "texlive-lshort-chinese"
+        "texlive-noto"
+        "texlive-notoccite"
+        "texlive-notomath"
+        "texlive-pdftex"
+        "texlive-scheme-basic"
+        "texlive-scripts"
+        "texlive-texinfo"
+        "texlive-xetex"
+        "texlive-xetex-bin"
+        "texlive-zhspacing"
+        "texlive-zhspacing:doc"
+        ))
 
 (define %hack-tools
   (list "nmap"
@@ -97,6 +111,7 @@
   (specifications->packages
    (append
     (list
+     "recutils"
      "docker-cli"
      "firefox"
      "font-adobe-source-han-sans:cn"
@@ -105,7 +120,6 @@
      "gimp"
      "gnupg"
      "go"
-     "i2pd"
      "icedove"
      "jami"
      "kdenlive"
@@ -122,7 +136,6 @@
     %emacs-for-guix
     %emacs-for-c
     %emacs-for-python
-    %emacs-for-latex
     %emacs-for-texinfo
     %hack-tools)))
 

@@ -245,7 +245,6 @@ destinationport = 6667
               (cpu "max")
               (cpu-count 2)
               (memory-size 4096)
-              (date (current-date))
               (systems (list "x86_64-linux"))
               (port-forwardings `((20022 . 22)
                                   (21004 . 1004)))

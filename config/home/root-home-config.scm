@@ -64,6 +64,7 @@
   (specifications->packages
    (append
     (list
+     "recutils"
      "gnupg"
      "go"
      "make"

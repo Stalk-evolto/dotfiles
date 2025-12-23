@@ -1,9 +1,10 @@
-\input texinfo
+\input texinfo-zh
 @c -*-texinfo-*-
 
 @c %**start of header
 @setfilename dotfile.info
 @documentencoding UTF-8
+@documentlanguage zh_CN
 @settitle Stalk Evolto's Guix Dotfiles
 @c %**end of header
 
@@ -29,7 +30,7 @@ Documentation License''.
 @insertcopying
 @end titlepage
 
-@contents
+@contents{}
 
 @c *********************************************************************
 @node Top, 简介, (dir), (dir)
@@ -37,17 +38,18 @@ Documentation License''.
 
 这篇文档是 GNU Guix version 的 dotfile 配置教程。
 
+@c *********************************************************************
 @menu
-* 简介::                        为什么使用 Guix?
-* 安装::                        在 Guix 发行版上使用 Stalk Evolto 的 dotfiles 配置系统.
-* 参考::                        dotfiles定义的拓展内容参考.
+@c * 简介::
+* 安装::
+* 参考::
 * GNU 自由文档许可证::
 * Concept Index::
 * Programming Index::
 @end menu
 
-@c *********************************************************************
 @node 简介, 安装, Top, Top
+@comment  node-name,  next,  previous,  up
 @chapter 简介
 
 Guix 是一个函数式包管理器，能够使用 Scheme 语言将其拓展配置，在 Guix 发行版上可以使用 guix system 定制你的系统，以及使用 guix home 保存用户配置。配置过程也不用担心损坏系统，上述命令拥有 container 参数可以创建隔离的一次性容器检验你你的配置，还可以使用 switch-generation 或者 roll-back (与 switch-generation -1 同效）回滚系统。使用 Scheme 可以轻松定义软件包以及服务，还能使用 @command{guix shell} 创建虚拟环境测试你的程序，不损坏系统环境。依赖项在相对隔离的 @file{/gnu/store} 目录下，通过符号链接使用，使得配置自己的个人电脑变得简单且易于维护。
@@ -63,7 +65,7 @@ Guix 是一个函数式包管理器，能够使用 Scheme 语言将其拓展配�
 @node Guix 安装, 使用 dotfiles 配置系统, 安装, 安装
 @section Guix 安装
 
-安装 Guix 可以参考 @uref{https://guix.gnu.org/manual/devel/en/html_node/Installation.html, Guix 官方文档}。
+安装 Guix 可以参考 @url{https://guix.gnu.org/manual/devel/en/html_node/Installation.html, Guix 官方文档}。
 
 由于 Guix 是自由软件操作系统发行版，笔记本用户安装 Guix 系统，可能会遇到无线网卡没有自由驱动，导致无法联网。
 @quotation
@@ -73,9 +75,9 @@ Guix 是一个函数式包管理器，能够使用 Scheme 语言将其拓展配�
 @author Free Software Foundation
 @end quotation
 
-为此我们在笔记本电脑上安装 Guix 操作系统，需要额外安装非自由驱动，而安装通道可以选择 @uref{https://gitlab.com/nonguix/nonguix， nonguix}。
+为此我们在笔记本电脑上安装 Guix 操作系统，需要额外安装非自由驱动，而安装通道可以选择 @url{https://gitlab.com/nonguix/nonguix, nonguix}。
 
-安装方法可以参考 @uref{https://wiki.systemcrafters.net/guix/nonguix-installation-guide, nonguix 安装指南}
+安装方法可以参考 @url{https://wiki.systemcrafters.net/guix/nonguix-installation-guide, nonguix 安装指南}
 
 @node 使用 dotfiles 配置系统,  , Guix 安装, 安装
 @section 使用 dotfiles 配置系统
@@ -119,6 +121,22 @@ guix home reconfigure -L $HOME/dotfiles $HOME/dotfiles/home/home-config.scm
 @c *********************************************************************
 @node 参考, GNU 自由文档许可证, 安装, Top
 @chapter 参考
+@menu
+* 服务::
+@end menu
+
+@node 服务,  , 参考, 参考
+@section 服务参考
+@menu
+* i2pd服务::
+@end menu
+
+@node i2pd服务,  , 服务, 服务
+@comment  node-name,  next,  previous,  up
+@subsection i2pd服务
+
+模块 (config services i2pd) 提供了 I2pd 服务。
+
 
 @c *********************************************************************
 @node GNU 自由文档许可证, Concept Index, 参考, Top
@@ -138,3 +156,8 @@ guix home reconfigure -L $HOME/dotfiles $HOME/dotfiles/home/home-config.scm
 @printindex fn
 
 @bye
+
+@c Local Variables:
+@c mode: Texinfo
+@c TeX-master: t
+@c End:
