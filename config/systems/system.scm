@@ -48,6 +48,7 @@
 
 (use-service-modules admin
                      cups
+                     cgit
                      databases
                      desktop
                      dns
@@ -120,8 +121,11 @@
 
     (service git-daemon-service-type
              (git-daemon-configuration
-              (export-all? #t)))
+              (whitelist '("/srv/git"))))
     (service update-git-mirror-service-type)
+    (service git-ssh-service-type
+             `(("git" ,(local-file "/home/stalk/keys/stalk-win.pub"))))
+    ;; (service cgit-service-type)
 
     ;; (service fcgiwrap-service-type)
     ;; (service nginx-service-type

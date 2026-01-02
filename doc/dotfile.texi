@@ -30,7 +30,7 @@ Documentation License''.
 @insertcopying
 @end titlepage
 
-@contents{}
+@contents
 
 @c *********************************************************************
 @node Top, 简介, (dir), (dir)
@@ -40,8 +40,8 @@ Documentation License''.
 
 @c *********************************************************************
 @menu
-@c * 简介::
-* 安装::
+* 简介::
+* 安装::                        安装 Guix System
 * 参考::
 * GNU 自由文档许可证::
 * Concept Index::
@@ -135,7 +135,37 @@ guix home reconfigure -L $HOME/dotfiles $HOME/dotfiles/home/home-config.scm
 @comment  node-name,  next,  previous,  up
 @subsection i2pd服务
 
-模块 (config services i2pd) 提供了 I2pd 服务。
+@cindex I2pd
+模块 (config services i2pd) 提供了 I2pd 服务。以 daemon 形式持续运行 I2pd。
+
+@defvar i2pd-service-type
+@url{https://i2pd.website/,I2pd}的守护进程服务类型。此服务类型的值为一个@code{i2pd-configuration}记录。
+给出一个简单示例。
+
+@lisp
+(i2pd-configuration
+              (config-file (plain-file "i2pd.conf" "\
+ipv6 = true
+"))
+              (tunnels-config-file (plain-file "tunnels.conf" "\
+[alt-socks]
+type = socks
+address = 127.0.0.1
+port = 14447
+keys = socks-keys.dat
+
+[IRC2]
+type = client
+address = 127.0.0.1
+port = 6669
+destination = irc.ilita.i2p
+destinationport = 6667
+#keys = irc-client-key.dat")))
+@end lisp
+
+@end defvar
+
+
 
 
 @c *********************************************************************

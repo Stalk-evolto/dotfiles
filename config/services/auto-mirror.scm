@@ -4,8 +4,10 @@
   #:use-module (guix git-download)
   #:use-module (guix records)
   #:use-module (gnu packages admin)
+  #:use-module (gnu packages version-control)
   #:use-module (gnu services)
   #:use-module (gnu services shepherd)
+  #:use-module (gnu services ssh)
   #:use-module (gnu services version-control)
   #:use-module (gnu system shadow)
   #:use-module (gnu system accounts)
@@ -15,7 +17,8 @@
   #:use-module (git)
   #:export (update-git-mirror!
             update-git-mirror-shepherd-type
-            update-git-mirror-service-type))
+            update-git-mirror-service-type
+            git-ssh-service-type))
 
 (define-record-type* <update-mirror-configuration>
   update-mirror-configuration make-update-mirror-configuration
@@ -78,3 +81,25 @@
                              update-git-mirror-shepherd-type)))
    (description "Periodically update git mirror repository in '/srv/git'.")
    (default-value (update-mirror-configuration))))
+
+(define %git-ssh-accounts
+  ;; User account and groups for Git Server SSH.
+  (list (user-group
+         (name "git")
+         (system? #f))
+        (user-account
+         (name "git")
+         (group "git")
+         (system? #f)
+         (comment "Git SSH Server user")
+         (home-directory "/srv/git")
+         (create-home-directory? #f)
+         (shell (file-append git "/bin/git-shell")))))
+
+(define git-ssh-service-type
+  (service-type (name 'git-ssh)
+                (extensions (list (service-extension openssh-service-type
+                                                     identity)
+                                  (service-extension account-service-type
+                                                     (const %git-ssh-accounts))))
+                (description "Git Server ssh allow authorized-keys.")))
