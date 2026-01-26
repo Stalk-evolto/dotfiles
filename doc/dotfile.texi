@@ -163,6 +163,8 @@ destinationport = 6667
 #keys = irc-client-key.dat")))
 @end lisp
 
+示例配置 I2pd 允许 IPv6 连接，创建了两个 tunnel ，分别为 socks 代理 和 IRC 聊天。
+
 @end defvar
 
 

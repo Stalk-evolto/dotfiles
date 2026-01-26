@@ -20,7 +20,8 @@
   #:use-module (gnu packages tor)
   #:use-module (gnu packages tls)
   #:use-module (gnu packages ruby)
-  #:use-module (gnu packages version-control))
+  #:use-module (gnu packages version-control)
+  #:export (tor-latest))
 
 (define-public tor-latest
   (package
@@ -192,5 +193,3 @@
    (properties '((release-tag-prefix . "^v")
                  (release-tag-version-delimiter . ".")
                  (accept-pre-releases . #t)))))
-
-tor-latest

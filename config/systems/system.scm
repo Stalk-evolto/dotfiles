@@ -56,6 +56,7 @@
                      messaging
                      monitoring
                      networking
+                     samba
                      spice
                      ssh
                      telephony
@@ -124,7 +125,8 @@
               (whitelist '("/srv/git"))))
     (service update-git-mirror-service-type)
     (service git-ssh-service-type
-             `(("git" ,(local-file "/home/stalk/keys/stalk-win.pub"))))
+             `(("git" ,(local-file "/home/stalk/keys/qin_rixiang.pub")
+                      ,(local-file "/home/stalk/keys/stalk-win.pub"))))
     ;; (service cgit-service-type)
 
     ;; (service fcgiwrap-service-type)
@@ -147,7 +149,7 @@
 
     (service pounce-service-type
              (pounce-configuration
-              (shepherd-requirement '(user-processes networking NetworkManager))
+              (shepherd-requirement '(user-processes networking))
               (host "irc.libera.chat")
               (client-cert "/etc/pounce/libera.pem")
               (sasl-external? #t)
@@ -231,6 +233,24 @@ destinationport = 6667
                      (tor-transport-plugin
                       (protocol "obfs4")
                       (program (file-append lyrebird "/bin/lyrebird")))))))
+
+    (service samba-service-type
+             (samba-configuration
+              (enable-samba? #f)
+              (enable-smbd? #t)
+              (enable-nmbd? #t)
+              (enable-winbindd? #f)
+              (config-file (plain-file "smb.conf" "\
+[global]
+map to guest = Bad User
+logging = syslog@1
+
+[public]
+browsable = yes
+path = /public
+read only = no
+guest ok = yes
+guest only = yes\n"))))
 
     (service libvirt-service-type
              (libvirt-configuration (unix-sock-group "libvirt")

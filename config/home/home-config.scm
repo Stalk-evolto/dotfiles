@@ -34,6 +34,7 @@
   #:use-module (gnu home services messaging)
   #:use-module (gnu system shadow)
   #:use-module (config home services home-channels)
+  #:use-module (config home services llvm)
   #:use-module (guix gexp)
   #:use-module (srfi srfi-1))
 
@@ -61,15 +62,16 @@
 
 (define %emacs-for-python
   (list "python"
+        "uv"
         ;; "python-autopep8"
         "python-black"
         "python-flake8"
         "python-jedi"
+        "python-invoke"
         "python-pycodestyle"
         "python-pytest-pycodestyle"
         "python-pylint"
         "python-scrapy"
-        "python-virtualenv"
         "python-yapf"))
 
 (define %emacs-for-texinfo
@@ -97,6 +99,9 @@
         "texlive-zhspacing"
         "texlive-zhspacing:doc"
         ))
+
+(define %llms
+  (list "llama-cpp-latest"))
 
 (define %hack-tools
   (list "nmap"
@@ -131,13 +136,16 @@
      "virt-manager"
      "virt-viewer"
      "vlc"
-     "rust")
+     "rust"
+     "gnome-shell-extension-gsconnect"
+     "gnome-system-monitor")
     %emacs-base-packages
     %emacs-for-guix
     %emacs-for-c
     %emacs-for-python
     %emacs-for-texinfo
-    %hack-tools)))
+    %hack-tools
+    %llms)))
 
  ;; Below is the list of Home services.  To search for available
  ;; services, run 'guix home search KEYWORD' in a terminal.
@@ -156,8 +164,10 @@
                          ("ll" . "ls -l")
                          ("ls" . "ls -p --color=auto")
                          ("update-home" . "guix home reconfigure -L $HOME/dotfiles $HOME/dotfiles/config/home/home-config.scm")))
-              (bashrc (list (local-file "../../files/.bashrc"
-                                        "bashrc")))
+              (bashrc (list (plain-file "bashrc" "\
+GUIX_PROFILE=$HOME/.guix-profile
+. $GUIX_PROFILE/etc/profile
+")))
               (bash-profile (list (local-file "../../files/.bash_profile"
                                               "bash_profile")))
               (environment-variables
@@ -167,7 +177,6 @@
                  ("GTK_IM_MODULE" . "ibus")
                  ("QT_IM_MODULE" . "ibus")
                  ("XMODIFILERS" . "@im=ibus")
-                 ("PATH" . "$HOME/.local/bin:$PATH")
                  ))))
 
     ;; GNU Readline Package CONFIG file .inputrc
@@ -224,6 +233,10 @@
 
     ;; ZNC IRC bouncer.
     ;; Start service befor use `znc --makeconf`.
-    (service home-znc-service-type))
+    (service home-znc-service-type)
+
+    ;; llama.cpp model server.
+    (service home-llama-server-service-type)
+    )
 
    %base-home-services)))
