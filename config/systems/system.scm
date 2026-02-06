@@ -204,6 +204,8 @@
              (i2pd-configuration
               (config-file (plain-file "i2pd.conf" "\
 ipv6 = true
+[reseed]
+proxy = http://localhost:8118
 "))
               (tunnels-config-file (plain-file "tunnels.conf" "\
 [alt-socks]

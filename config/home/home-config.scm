@@ -45,8 +45,7 @@
         "emacs"
         "emacs-debbugs"
         "git"
-        "ripgrep"
-        ))
+        "ripgrep"))
 
 (define %emacs-for-guix
   (list "emacs-guix"
@@ -61,9 +60,8 @@
   (list "gcc-toolchain"))
 
 (define %emacs-for-python
-  (list "python"
+  (list "python-wrapper"
         "uv"
-        ;; "python-autopep8"
         "python-black"
         "python-flake8"
         "python-jedi"
@@ -71,7 +69,6 @@
         "python-pycodestyle"
         "python-pytest-pycodestyle"
         "python-pylint"
-        "python-scrapy"
         "python-yapf"))
 
 (define %emacs-for-texinfo
@@ -216,7 +213,14 @@ GUIX_PROFILE=$HOME/.guix-profile
                       (user "stalk")
                       (port 10022)
                       (forward-agent? #t)
-                      (identity-file "/home/stalk/.ssh/id_ed25519"))))))
+                      (identity-file "/home/stalk/.ssh/id_ed25519"))
+                     (openssh-host
+                      (name "windows")
+                      (host-name "192.168.100.132")
+                      (user "Link")
+                      (port 22)
+                      (forward-agent? #t)
+                      (identity-file "/home/stalk/.ssh/stalk_ed25519"))))))
 
     ;; Channels append nonguix.
     channels-append-service
