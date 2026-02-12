@@ -47,6 +47,8 @@
           (default (car (find-files "/home/stalk/.cache/llama.cpp" "\\.gguf$"))))
   (port llama-server-configuration-port
         (default 5432))
+  (threads llama-server-configuration-threads
+           (default -1))
   (memory-size llama-server-configuration-memory-size
                (default 4096))
   (extra-options llama-server-configuration-extra-options
@@ -55,6 +57,7 @@
 (define (llama-server-shepherd-service config)
   (let ((module (llama-server-configuration-module config))
         (port (number->string (llama-server-configuration-port config)))
+        (threads (number->string (llama-server-configuration-threads config)))
         (memory-size (number->string (llama-server-configuration-memory-size config)))
         (extra-options (llama-server-configuration-extra-options config)))
 
@@ -63,7 +66,8 @@
            (provision '(llama-server))
            (start #~(make-forkexec-constructor
                      (list #$(file-append llama-cpp-latest "/bin/llama-server")
-                           "-m" #$module "--port" #$port "-n" #$memory-size
+                           "-m" #$module "--port" #$port "--ctx-size" #$memory-size
+                           "--threads" #$threads
                            #$@extra-options)))
            (stop #~(make-kill-destructor))))))
 

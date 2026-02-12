@@ -73,10 +73,12 @@
 
 (define %emacs-for-texinfo
   (list "calc"
+        "curl"
         "font-arphic-ukai"
         "font-google-noto-serif-cjk"
         "font-google-noto-serif-cjk-static"
         "gettext"
+        "pinentry"
         "rubber"
         "texi2html"
         "texinfo"
@@ -240,7 +242,11 @@ GUIX_PROFILE=$HOME/.guix-profile
     (service home-znc-service-type)
 
     ;; llama.cpp model server.
-    (service home-llama-server-service-type)
+    (service home-llama-server-service-type
+             (llama-server-configuration
+              (threads 6)
+              (extra-options '("--cache-type-k" "q4_0"
+                               "--cache-type-v" "q4_0"))))
     )
 
    %base-home-services)))
