@@ -35,6 +35,7 @@
   #:use-module (gnu system shadow)
   #:use-module (config home services home-channels)
   #:use-module (config home services llvm)
+  #:use-module (config home services emacs)
   #:use-module (guix gexp)
   #:use-module (srfi srfi-1))
 
@@ -57,7 +58,10 @@
         "guile-hall"))
 
 (define %emacs-for-c
-  (list "gcc-toolchain"))
+  (list "gcc-toolchain"
+        "clang"
+        "global"
+        ))
 
 (define %emacs-for-python
   (list "python-wrapper"
@@ -162,6 +166,8 @@
                          ("ip" . "ip -color=auto")
                          ("ll" . "ls -l")
                          ("ls" . "ls -p --color=auto")
+                         ("e" . "emacsclient -t")
+                         ("ec" . "emacsclient -c")
                          ("update-home" . "guix home reconfigure -L $HOME/dotfiles $HOME/dotfiles/config/home/home-config.scm")))
               (bashrc (list (plain-file "bashrc" "\
 GUIX_PROFILE=$HOME/.guix-profile
@@ -247,6 +253,8 @@ GUIX_PROFILE=$HOME/.guix-profile
               (threads 6)
               (extra-options '("--cache-type-k" "q4_0"
                                "--cache-type-v" "q4_0"))))
-    )
+
+    ;; emacs daemon.
+    (service home-emacs-service-type))
 
    %base-home-services)))
