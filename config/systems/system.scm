@@ -220,7 +220,29 @@ address = 127.0.0.1
 port = 6669
 destination = irc.ilita.i2p
 destinationport = 6667
-#keys = irc-client-key.dat"))))
+keys = irc-client-key.dat
+
+[TG-MTPROXY-1]
+type = client
+address = 127.0.0.1
+port = 8440
+destination = vxxfipsygx6jpz57pmb3d3mjgsk5ls2idxeo2bffs3yp62muyq7q.b32.i2p
+signaturetype = 7
+inbound.length = 1
+outbound.length = 1
+inbound.quantity = 5
+outbound.quantity = 5
+i2cp.leaseSetType = 3
+i2cp.leaseSetEncType = 0,4
+i2p.streaming.initialAckDelay = 20
+keys = transient-tg-mtproxy
+
+[TG-MTPROXY-2]
+type = client
+address = 127.0.0.1
+port = 8441
+destination = vp3vans4ra3vpo24orm5seaxvod4x4lwiqajrfazb62hfwb45ddq.b32.i2p
+keys = transient-tg-mtproxy"))))
 
     (service tor-service-type
              (tor-configuration

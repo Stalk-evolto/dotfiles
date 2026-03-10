@@ -37,7 +37,13 @@
       (let f ((entry (readdir dir)) (ls '()))
         (cond
          ((eof-object? entry) ls)
-         ((not (or (string=? entry ".") (string=? entry "..")))
+	 ((not (and
+		(= (stat:uid (stat (string-append path "/" entry))) (passwd:uid (getpw user)))
+		(= (stat:gid (stat (string-append path "/" entry))) (group:gid (getgr group)))))
+	  (f (readdir dir) ls))
+         ((not (or (string=? entry ".")
+		   (string=? entry "..")
+		   (not (string-suffix? ".git" entry))))
           (f (readdir dir) (cons (string-append path "/" entry) ls)))
          (else (f (readdir dir) ls)))))
     (closedir dir)

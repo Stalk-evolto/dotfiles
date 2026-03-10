@@ -58,10 +58,15 @@
         "guile-hall"))
 
 (define %emacs-for-c
-  (list "gcc-toolchain"
+  (list "binutils"
+        "gcc-toolchain"
         "clang"
         "global"
-        ))
+        "gdb"
+        "autoconf"
+        "automake"
+        "libtool"
+        "make"))
 
 (define %emacs-for-python
   (list "python-wrapper"
@@ -119,11 +124,17 @@
   (specifications->packages
    (append
     (list
+     "emacs-telega"
+     "monero"
+     "electrum"
+     "electron-cash"
      "recutils"
      "docker-cli"
      "firefox"
      "font-adobe-source-han-sans:cn"
      "font-wqy-microhei"
+     "font-gnu-unifont"
+     "font-gnu-freefont"
      "fontconfig"
      "gimp"
      "gnupg"
@@ -136,6 +147,7 @@
      "mariadb"
      "obs"
      "pinentry"
+     "qutebrowser"
      "virt-manager"
      "virt-viewer"
      "vlc"
