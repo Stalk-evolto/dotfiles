@@ -36,6 +36,7 @@
   #:use-module (config home services home-channels)
   #:use-module (config home services llvm)
   #:use-module (config home services emacs)
+  #:use-module (config home services monerod)
   #:use-module (guix gexp)
   #:use-module (srfi srfi-1))
 
@@ -267,6 +268,24 @@ GUIX_PROFILE=$HOME/.guix-profile
                                "--cache-type-v" "q4_0"))))
 
     ;; emacs daemon.
-    (service home-emacs-service-type))
+    (service home-emacs-service-type)
+
+    ;; menero daemon.
+    (service home-monerod-service-type
+             (home-monerod-configuration
+              (proxy "127.0.0.1:9050")
+              (p2p-bind-ip "127.0.0.1")
+              (no-igd? #t)
+              (tx-proxy (list
+                         (tx-proxy-configuration
+                          (type "tor")
+                          (address "127.0.0.1")
+                          (port 9050))))
+              (anonymous-inbound
+               (list
+                (anonymous-inbound-configuration
+                 (address
+                  "ddptxpji2ynf6y4eeudcw4qgqtqswzwtmbpr7z5ei3zdehk47qpgnkyd.onion:18084")
+                 (host-local "127.0.0.1:18084")))))))
 
    %base-home-services)))

@@ -250,6 +250,10 @@ keys = transient-tg-mtproxy"))))
               (socks-socket-type 'tcp)
               (config-file (local-file
                             "/etc/tor/torrc"))
+              (hidden-services
+               (list (tor-onion-service-configuration
+                      (name "monero-service")
+                      (mapping '((18084 "127.0.0.1:18084"))))))
               (transport-plugins
                (list (tor-transport-plugin
                       (protocol "webtunnel")
