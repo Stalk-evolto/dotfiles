@@ -49,7 +49,8 @@
   (anonymous-inbound monerod-configuration-anonymous-inbound
                      (default '()))
   (extra-options monerod-configuration-extra-options
-                 (default '("--prune-blockchain"
+                 (default '("--rpc-restricted-bind-port" "18089"
+                            "--prune-blockchain"
                             "--sync-pruned-blocks"))))
 
 (define-configuration/no-serialization tx-proxy-configuration
