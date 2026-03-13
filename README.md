@@ -62,9 +62,8 @@ If you find this project useful, please consider a donation to the following add
 
 - Monero: 45ZqrRoH3HTEH6g17hLgfxATw2UT8NeGfg8jcLPFcaNXARRTPaicyaJXMHgA97XReXX8mCNy22v6BXxRCKaKZMXv1aUJGR1
 
-- Bitcoin: <bitcoin:bc1qc4elspz70gt5hjh3fnetle2lhay620sdmqwudj?message=Thank%20you%20for%20your%20sponsorship.>
+- Bitcoin: bc1qc4elspz70gt5hjh3fnetle2lhay620sdmqwudj
 
 or use liberapay:
 
-<script src="https://liberapay.com/stalk/widgets/button.js"></script>
 <noscript><a href="https://liberapay.com/stalk/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a></noscript>
