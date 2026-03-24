@@ -30,6 +30,7 @@
 (define-module (config systems system)
   #:use-module (gnu)
   #:use-module (gnu packages)
+  #:use-module (guix store)
   #:use-module (guix packages)
   #:use-module (guix least-authority)
   #:use-module (nongnu packages linux)
@@ -53,6 +54,7 @@
                      desktop
                      dns
                      docker
+                     guix
                      messaging
                      monitoring
                      networking
@@ -97,6 +99,9 @@
  (services
   (append
    (list
+    (service shared-cache-service-type
+             (shared-cache-configuration
+              (users (list (user-cache (user "stalk"))))))
     (service gnome-desktop-service-type)
     (service file-database-service-type)
     (service package-database-service-type)
@@ -290,23 +295,25 @@ guest only = yes\n"))))
                (lookup-qemu-platforms "arm" "aarch64"))))
 
     (service virtlog-service-type
-             (virtlog-configuration (max-clients 1000)))
+             (virtlog-configuration
+              (max-clients 1000)
+              (log-outputs "2:file:/var/log/virtlog")))
 
     (service virtual-build-machine-service-type
              (virtual-build-machine
               (image %build-vm-machine-image)
               (cpu "max")
-              (cpu-count 2)
-              (memory-size 4096)
+              (cpu-count 1)
+              (memory-size 2048)
               (systems (list "x86_64-linux"))
-              (port-forwardings `((20022 . 22)
-                                  (21004 . 1004)))
-              (auto-start? #t)))
+              (port-forwardings `((21004 . 1004)
+                                  (21022 . 22)))
+              (auto-start? #f)))
     (service hurd-vm-service-type
              (hurd-vm-configuration (os %childhurd-os)
                                     (disk-size (* 5000
                                                   (expt 2 20)))
-                                    (memory-size 2048)))
+                                    (memory-size 1024)))
 
     (set-xorg-configuration
      (xorg-configuration (keyboard-layout keyboard-layout))))
@@ -319,19 +326,8 @@ guest only = yes\n"))))
                 (discover? #t)
                 (http-proxy "http://localhost:8118")
                 (substitute-urls
-                 (list "https://4zwzi66wwdaalbhgnix55ea3ab4pvvw66ll2ow53kjub6se4q2bclcyd.onion"
-                       "https://bordeaux.guix.gnu.org"
-                       "https://substitutes.nonguix.org"))
-                (authorized-keys
-                 (append (list (plain-file "signing-key.pub" "\
-(public-key
-        (ecc
-                (curve Ed25519)
-                (q #C1FD53E5D4CE971933EC50C9F307AE2171A2D3B52C804642A7A35F84F3A4EA98#)
-        )
-)
-"))
-                %default-authorized-guix-keys)))))))
+                 (list "\
+https://4zwzi66wwdaalbhgnix55ea3ab4pvvw66ll2ow53kjub6se4q2bclcyd.onion")))))))
 
  (bootloader (bootloader-configuration
               (bootloader grub-efi-bootloader)

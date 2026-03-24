@@ -99,7 +99,6 @@ GUIX_PROFILE=$HOME/.guix-profile
 ")))
               (environment-variables
                `(
-                 ("XDG_CACHE_HOME" . "/root/.cache")
                  ("PATH" . "$HOME/.local/bin:$PATH")
                  ))))
 
