@@ -1,0 +1,352 @@
+;;; GNU Guix --- Functional package management for GNU
+;;; Copyright © 2025 Stalk Evolto <stalk-evolto@outlook.com>
+;;;
+;;; This file is part of GNU Guix.
+;;;
+;;; GNU Guix is free software; you can redistribute it and/or modify it
+;;; under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 3 of the License, or (at
+;;; your option) any later version.
+;;;
+;;; GNU Guix is distributed in the hope that it will be useful, but
+;;; WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with GNU Guix.  If not, see <http://www.gnu.org/licenses/>.
+;;
+;;
+;; This is an operating system configuration generated
+;; by the graphical installer.
+;;
+;; Once installation is complete, you can learn and modify
+;; this file to tweak the system configuration, and pass it
+;; to the 'guix system reconfigure' command to effect your
+;; changes.
+
+;; Indicate which modules to import to access the variables
+;; used in this configuration.
+(define-module (config systems system)
+  #:use-module (gnu)
+  #:use-module (gnu packages)
+  #:use-module (guix store)
+  #:use-module (guix packages)
+  #:use-module (guix least-authority)
+  #:use-module (nongnu packages linux)
+  #:use-module (nongnu system linux-initrd)
+  #:use-module (config systems hurd)
+  #:use-module (config services i2pd)
+  #:use-module (config services auto-mirror)
+  #:use-module (config packages tor)
+  #:use-module (srfi srfi-19))
+
+(use-modules (config systems base-system))
+(use-package-modules databases
+                     golang-web
+                     ssh
+                     xml)
+
+(use-service-modules admin
+                     cups
+                     cgit
+                     databases
+                     desktop
+                     dns
+                     docker
+                     guix
+                     messaging
+                     monitoring
+                     networking
+                     samba
+                     spice
+                     ssh
+                     telephony
+                     version-control
+                     virtualization
+                     web
+                     xorg
+                     base)
+
+(operating-system
+ (inherit %base-system)
+ (kernel linux)
+ (initrd microcode-initrd)
+ (firmware (list linux-firmware))
+ (locale "en_US.utf8")
+ (timezone "Asia/Shanghai")
+ (keyboard-layout (keyboard-layout "us"))
+ (host-name "stalk-laptop")
+
+ ;; The list of user accounts ('root' is implicit).
+ (users (cons* (user-account
+                (name "stalk")
+                (comment "Stalk")
+                (group "users")
+                (home-directory "/home/stalk")
+                (supplementary-groups '("wheel" "netdev" "audio" "video"
+                                        "libvirt"))) %base-user-accounts))
+
+ ;; Packages installed system-wide.  Users can also install packages
+ ;; under their own account: use 'guix search KEYWORD' to search
+ ;; for packages and 'guix install PACKAGE' to install a package.
+ (packages (append (map specification->package
+                        '("ibus" "ibus-rime" "ibus-libpinyin" "dconf" "font-adobe-source-han-sans"))
+                   %base-packages))
+
+ ;; Below is the list of system services.  To search for available
+ ;; services, run 'guix system search KEYWORD' in a terminal.
+ (services
+  (append
+   (list
+    (service shared-cache-service-type
+             (shared-cache-configuration
+              (users (list (user-cache (user "stalk"))))))
+    (service gnome-desktop-service-type)
+    (service file-database-service-type)
+    (service package-database-service-type)
+
+    ;; To configure OpenSSH, pass an 'openssh-configuration'
+    ;; record as a second argument to 'service' below.
+    (service openssh-service-type
+             (openssh-configuration
+              (permit-root-login 'prohibit-password)
+              (password-authentication? #f)
+              (accepted-environment '("COLORTERM"))
+              (subsystems
+               `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))
+              (authorized-keys
+               `(("stalk" ,(local-file "/home/stalk/keys/stalk.pub"))
+                 ("root" ,(local-file "/root/keys/stalk.pub"))))))
+    (service guix-publish-service-type
+             (guix-publish-configuration
+              (port 80)
+              (advertise? #t)
+              (cache "/var/cache/guix/publish")
+              (ttl 432000)))
+
+    (service git-daemon-service-type
+             (git-daemon-configuration
+              (whitelist '("/srv/git"))))
+    (service update-git-mirror-service-type)
+    (service git-ssh-service-type
+             `(("git" ,(local-file "/home/stalk/keys/qin_rixiang.pub")
+                      ,(local-file "/home/stalk/keys/stalk-win.pub"))))
+    ;; (service cgit-service-type)
+
+    ;; (service fcgiwrap-service-type)
+    ;; (service nginx-service-type
+    ;;          (nginx-configuration
+    ;;           (server-blocks
+    ;;            (list
+    ;;             (nginx-server-configuration
+    ;;              (listen '("443 ssl"))
+    ;;              (server-name "localhost:9418")
+    ;;              (ssl-certificate
+    ;;               "/etc/certs/git.stalk-evolto.org/fullchain.pem")
+    ;;              (ssl-certificate-key
+    ;;               "/etc/certs/git.stalk-evolto.org/privkey.pem")
+    ;;              (locations
+    ;;               (list
+    ;;                (git-http-nginx-location-configuration
+    ;;                 (git-http-configuration (uri-path "/"))))))))))
+    ;; (service certbot-service-type)
+
+    (service pounce-service-type
+             (pounce-configuration
+              (shepherd-requirement '(user-processes networking))
+              (host "irc.libera.chat")
+              (client-cert "/etc/pounce/libera.pem")
+              (sasl-external? #t)
+              (nick "stalk")
+              (join (list "#gnu" "#guix" "#guile" "#hurd"))))
+    (service jami-service-type
+             (jami-configuration
+              (accounts
+               (list (jami-account
+                      (archive "/etc/jami/unencrypted-account-1.gz"))))))
+    (service spice-vdagent-service-type)
+    (service containerd-service-type)
+    (service docker-service-type)
+    (service mysql-service-type
+             (mysql-configuration
+              (bind-address "0.0.0.0")
+              (extra-content
+               `(string-append "basedir=" ,mariadb))
+              (extra-environment #~'("HOSTNAME='stalk-evolto'"))
+              (auto-upgrade? #f)))
+    (service redis-service-type)
+    ;;     (service nftables-service-type
+    ;;              (nftables-configuration
+    ;;               (ruleset (plain-file "nftables.conf" "\
+    ;; # A Simple ruleset for a workstation
+    ;; table inet filter {
+    ;;   chain input {
+    ;;     type filter hook input priority 0; policy drop;
+
+    ;;     # accept any localhost traffic
+    ;;     iif lo accept
+
+    ;;     # accept traffic originated from us
+    ;;     ct state established,related accept
+
+    ;;     # accept neighbour discovery otherwise IPv6 connectivity breaks
+    ;;     icmpv6 type { nd-neighbor-solicit, nd-router-advert, nd-neighbor-advert } accept
+
+    ;;     # Allow SSH on port TCP/22 and allow HTTP(s) TCP/80 and TCP/443
+    ;;     # for IPV4 and IPV6
+    ;;     tcp dport { 22, 80, 443 } accept
+
+    ;;    }
+    ;; }
+    ;; "))))
+
+    ;; (service darkstat-service-type
+    ;;          (darkstat-configuration
+    ;;           (interface "wlo1")))
+
+    (service i2pd-service-type
+             (i2pd-configuration
+              (config-file (plain-file "i2pd.conf" "\
+ipv6 = true
+[reseed]
+proxy = http://localhost:8118
+"))
+              (tunnels-config-file (plain-file "tunnels.conf" "\
+[alt-socks]
+type = socks
+address = 127.0.0.1
+port = 14447
+keys = socks-keys.dat
+
+[IRC2]
+type = client
+address = 127.0.0.1
+port = 6669
+destination = irc.ilita.i2p
+destinationport = 6667
+keys = irc-client-key.dat
+
+[TG-MTPROXY-1]
+type = client
+address = 127.0.0.1
+port = 8440
+destination = vxxfipsygx6jpz57pmb3d3mjgsk5ls2idxeo2bffs3yp62muyq7q.b32.i2p
+signaturetype = 7
+inbound.length = 1
+outbound.length = 1
+inbound.quantity = 5
+outbound.quantity = 5
+i2cp.leaseSetType = 3
+i2cp.leaseSetEncType = 0,4
+i2p.streaming.initialAckDelay = 20
+keys = transient-tg-mtproxy
+
+[TG-MTPROXY-2]
+type = client
+address = 127.0.0.1
+port = 8441
+destination = vp3vans4ra3vpo24orm5seaxvod4x4lwiqajrfazb62hfwb45ddq.b32.i2p
+keys = transient-tg-mtproxy"))))
+
+    (service tor-service-type
+             (tor-configuration
+              (tor tor-latest)
+              (socks-socket-type 'tcp)
+              (config-file (local-file
+                            "/etc/tor/torrc"))
+              (hidden-services
+               (list (tor-onion-service-configuration
+                      (name "monero-service")
+                      (mapping '((18084 "127.0.0.1:18084")
+                                 (18089 "127.0.0.1:18089"))))))
+              (transport-plugins
+               (list (tor-transport-plugin
+                      (protocol "webtunnel")
+                      (program (file-append webtunnel "/bin/client")))
+                     (tor-transport-plugin
+                      (protocol "obfs4")
+                      (program (file-append lyrebird "/bin/lyrebird")))))))
+
+    (service samba-service-type
+             (samba-configuration
+              (enable-samba? #f)
+              (enable-smbd? #t)
+              (enable-nmbd? #t)
+              (enable-winbindd? #f)
+              (config-file (plain-file "smb.conf" "\
+[global]
+map to guest = Bad User
+logging = syslog@1
+
+[public]
+browsable = yes
+path = /public
+read only = no
+guest ok = yes
+guest only = yes\n"))))
+
+    (service libvirt-service-type
+             (libvirt-configuration
+	      (unix-sock-group "libvirt")
+              (tls-port "16555")))
+    (service qemu-binfmt-service-type
+             (qemu-binfmt-configuration
+              (platforms
+               (lookup-qemu-platforms "arm" "aarch64"))))
+
+    (service virtlog-service-type
+             (virtlog-configuration
+              (max-clients 1000)
+              (log-outputs "2:file:/var/log/virtlog")))
+
+    (service virtual-build-machine-service-type
+             (virtual-build-machine
+              (image %build-vm-machine-image)
+              (cpu "max")
+              (cpu-count 1)
+              (memory-size 2048)
+              (systems (list "x86_64-linux"))
+              (port-forwardings `((21004 . 1004)
+                                  (21022 . 22)))
+              (auto-start? #f)))
+    (service hurd-vm-service-type
+             (hurd-vm-configuration (os %childhurd-os)
+                                    (disk-size (* 5000
+                                                  (expt 2 20)))
+                                    (memory-size 1024)))
+
+    (set-xorg-configuration
+     (xorg-configuration (keyboard-layout keyboard-layout))))
+
+   ;; This is the default list of services
+   ;; we are appending to.
+   (modify-services %desktop-services
+            (guix-service-type config => (guix-configuration
+                (inherit config)
+                (discover? #t)
+                (http-proxy "http://localhost:8118"))))))
+
+ (bootloader (bootloader-configuration
+              (bootloader grub-efi-bootloader)
+              (targets (list "/boot/efi"))
+              (keyboard-layout keyboard-layout)))
+ (swap-devices (list (swap-space
+                       (target (file-system-label "swap")))))
+
+ ;; The list of file systems that get "mounted".  The unique
+ ;; file system identifiers there ("UUIDs") can be obtained
+ ;; by running 'blkid' in a terminal.
+ (file-systems (cons* (file-system
+                       (mount-point "/home")
+                       (device (file-system-label "my-home"))
+                       (type "ext4"))
+                      (file-system
+                       (mount-point "/")
+                       (device (file-system-label "my-root"))
+                       (type "ext4"))
+                      (file-system
+                       (mount-point "/boot/efi")
+                       (device (uuid "25E4-BEAB" 'fat32))
+                       (type "vfat"))
+                      %base-file-systems)))
