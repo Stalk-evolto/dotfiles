@@ -123,7 +123,7 @@
   (package
    (inherit go-gitlab-torproject-org-tpo-anti-censorship-pluggable-transports-webtunnel)
    (name "webtunnel")
-   (version "0.0.3")
+   (version "v0.0.4")
    (source
     (origin
      (method git-fetch)
@@ -132,7 +132,7 @@
            (commit version)))
      (file-name (git-file-name name version))
      (sha256
-      (base32 "092r0f42cgb2ksplszkxvirmvmmlxd8xvdj555gywy0948c7j7qw"))))
+      (base32 "07l9i361n0kglcda86gl4m0iciy8qygzgavgbknxf33fzkdslifk"))))
    (arguments
     (list
      #:import-path "gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/webtunnel"

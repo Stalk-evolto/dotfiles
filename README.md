@@ -25,14 +25,14 @@ git submodule update
 
 ```shell
 git fetch origin keyring:keyring
-guix git authenticate 3bd01d5dd91c11595c28c9a3666f6a18869b4fe5 \
+guix git authenticate 4908ec08928c13a2376341e754558be5b9ae4c40 \
   "1903 4003 F817 AABF AA97  0070 7303 8079 9D2B CDD0"
 ```
 
 如果成功，终端会有如下显示
 
 ```shell
-guix git: successfully authenticated commit cbc970677a439191b59d4787823ff447a154c45d
+guix git: successfully authenticated commit 4908ec08928c13a2376341e754558be5b9ae4c40
 ```
 
 4. 使用`guix system`重新配置系统

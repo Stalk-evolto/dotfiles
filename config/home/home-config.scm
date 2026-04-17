@@ -32,11 +32,14 @@
   #:use-module (gnu home services ssh)
   #:use-module (gnu home services dotfiles)
   #:use-module (gnu home services messaging)
+  #:use-module (gnu home services secrets)
+  #:use-module (gnu home services desktop)
   #:use-module (gnu system shadow)
   #:use-module (config home services home-channels)
   #:use-module (config home services llvm)
   #:use-module (config home services emacs)
   #:use-module (config home services monerod)
+  #:use-module (config packages eclip)
   #:use-module (guix gexp)
   #:use-module (srfi srfi-1))
 
@@ -45,7 +48,9 @@
   (list "aspell"
         "aspell-dict-en"
         "emacs"
+        "emacs-eclip"
         "emacs-debbugs"
+        "emacs-ellama"
         "git"
         "ripgrep"))
 
@@ -53,6 +58,7 @@
   (list "emacs-guix"
         "emacs-geiser"
         "emacs-geiser-guile"
+	"emacs-paredit"
         "guile"
         "guile-readline"
         "guile-colorized"
@@ -60,7 +66,6 @@
 
 (define %emacs-for-c
   (list "binutils"
-        "gcc-toolchain"
         "gdb"
         "autoconf"
         "automake"
@@ -70,6 +75,7 @@
 (define %emacs-for-python
   (list "python-wrapper"
         "uv"
+	"python-lsp-server"
         "python-black"
         "python-flake8"
         "python-jedi"
@@ -138,15 +144,12 @@
      "gimp"
      "gnupg"
      "go"
-     ;; "icedove"
      "jami"
      "kdenlive"
      "libreoffice"
-     "make"
      "mariadb"
      "obs"
      "pinentry"
-     "qutebrowser"
      "virt-manager"
      "virt-viewer"
      "vlc"
@@ -240,6 +243,13 @@ GUIX_PROFILE=$HOME/.guix-profile
                       (port 22)
                       (forward-agent? #t)
                       (identity-file "/home/stalk/.ssh/stalk_ed25519"))))))
+
+    ;; Password massage.
+    (service home-himitsu-service-type)
+    (service home-himitsu-ssh-service-type)
+    (service home-himitsu-secret-service-type)
+
+    (service home-dbus-service-type)
 
     ;; Channels append nonguix.
     channels-append-service

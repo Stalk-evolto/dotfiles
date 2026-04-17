@@ -259,7 +259,10 @@ keys = transient-tg-mtproxy"))))
                (list (tor-onion-service-configuration
                       (name "monero-service")
                       (mapping '((18084 "127.0.0.1:18084")
-                                 (18089 "127.0.0.1:18089"))))))
+                                 (18089 "127.0.0.1:18089"))))
+		     (tor-onion-service-configuration
+		      (name "blog")
+		      (mapping '((8080 "127.0.0.1:8080"))))))
               (transport-plugins
                (list (tor-transport-plugin
                       (protocol "webtunnel")
