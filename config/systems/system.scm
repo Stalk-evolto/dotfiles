@@ -159,7 +159,7 @@
               (client-cert "/etc/pounce/libera.pem")
               (sasl-external? #t)
               (nick "stalk")
-              (join (list "#gnu" "#guix" "#guile" "#hurd"))))
+              (join (list "#gnu" "#guix" "#guile" "#hurd" "#fossjobs"))))
     (service jami-service-type
              (jami-configuration
               (accounts
