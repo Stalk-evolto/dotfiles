@@ -35,38 +35,40 @@
   #:use-module (guix least-authority)
   #:use-module (nongnu packages linux)
   #:use-module (nongnu system linux-initrd)
+  #:use-module (gnu packages databases)
+  #:use-module (gnu packages golang-web)
+  #:use-module (gnu packages ssh)
+  #:use-module (gnu packages xml)
+  #:use-module (gnu services mail)
+  #:use-module (gnu services getmail)
+  #:use-module (gnu services admin)
+  #:use-module (gnu services cups)
+  #:use-module (gnu services cgit)
+  #:use-module (gnu services databases)
+  #:use-module (gnu services desktop)
+  #:use-module (gnu services dns)
+  #:use-module (gnu services docker)
+  #:use-module (gnu services guix)
+  #:use-module (gnu services messaging)
+  #:use-module (gnu services monitoring)
+  #:use-module (gnu services networking)
+  #:use-module (gnu services samba)
+  #:use-module (gnu services spice)
+  #:use-module (gnu services ssh)
+  #:use-module (gnu services dns)
+  #:use-module (gnu services telephony)
+  #:use-module (gnu services version-control)
+  #:use-module (gnu services virtualization)
+  #:use-module (gnu services web)
+  #:use-module (gnu services xorg)
+  #:use-module (gnu services base)
   #:use-module (config systems hurd)
+  #:use-module (config systems base-system)
   #:use-module (config services i2pd)
   #:use-module (config services auto-mirror)
   #:use-module (config packages tor)
+  #:use-module (config packages mail)
   #:use-module (srfi srfi-19))
-
-(use-modules (config systems base-system))
-(use-package-modules databases
-                     golang-web
-                     ssh
-                     xml)
-
-(use-service-modules admin
-                     cups
-                     cgit
-                     databases
-                     desktop
-                     dns
-                     docker
-                     guix
-                     messaging
-                     monitoring
-                     networking
-                     samba
-                     spice
-                     ssh
-                     telephony
-                     version-control
-                     virtualization
-                     web
-                     xorg
-                     base)
 
 (operating-system
  (inherit %base-system)
@@ -91,7 +93,11 @@
  ;; under their own account: use 'guix search KEYWORD' to search
  ;; for packages and 'guix install PACKAGE' to install a package.
  (packages (append (map specification->package
-                        '("ibus" "ibus-rime" "ibus-libpinyin" "dconf" "font-adobe-source-han-sans"))
+                        '("ibus"
+                          "ibus-rime"
+                          "ibus-libpinyin"
+                          "dconf"
+                          "font-adobe-source-han-sans"))
                    %base-packages))
 
  ;; Below is the list of system services.  To search for available
@@ -105,6 +111,11 @@
     (service gnome-desktop-service-type)
     (service file-database-service-type)
     (service package-database-service-type)
+
+    (service dnsmasq-service-type
+             (dnsmasq-configuration
+              (no-resolv? #t)
+              (servers '("192.168.1.1" "::1" "8.8.8.8"))))
 
     ;; To configure OpenSSH, pass an 'openssh-configuration'
     ;; record as a second argument to 'service' below.
@@ -151,6 +162,24 @@
     ;;                (git-http-nginx-location-configuration
     ;;                 (git-http-configuration (uri-path "/"))))))))))
     ;; (service certbot-service-type)
+
+    (service dovecot-service-type
+             (dovecot-configuration
+               (dovecot dovecot-latest)
+               (mail-location "maildir:~/.mail")
+               (protocols
+                (list (protocol-configuration
+                        (name "imap"))
+                      (protocol-configuration
+                        (name "lmtp"))))))
+
+    (service exim-service-type
+             (exim-configuration
+              (package exim-latest)
+              (config-file (local-file "/etc/exim.conf"))))
+
+    (service mail-aliases-service-type
+             '(("postmaster" "stalk")))
 
     (service pounce-service-type
              (pounce-configuration
@@ -328,28 +357,4 @@ guest only = yes\n"))))
             (guix-service-type config => (guix-configuration
                 (inherit config)
                 (discover? #t)
-                (http-proxy "http://localhost:8118"))))))
-
- (bootloader (bootloader-configuration
-              (bootloader grub-efi-bootloader)
-              (targets (list "/boot/efi"))
-              (keyboard-layout keyboard-layout)))
- (swap-devices (list (swap-space
-                       (target (file-system-label "swap")))))
-
- ;; The list of file systems that get "mounted".  The unique
- ;; file system identifiers there ("UUIDs") can be obtained
- ;; by running 'blkid' in a terminal.
- (file-systems (cons* (file-system
-                       (mount-point "/home")
-                       (device (file-system-label "my-home"))
-                       (type "ext4"))
-                      (file-system
-                       (mount-point "/")
-                       (device (file-system-label "my-root"))
-                       (type "ext4"))
-                      (file-system
-                       (mount-point "/boot/efi")
-                       (device (uuid "25E4-BEAB" 'fat32))
-                       (type "vfat"))
-                      %base-file-systems)))
+                (http-proxy "http://localhost:8118")))))))

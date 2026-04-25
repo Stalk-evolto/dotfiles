@@ -100,39 +100,34 @@
                 (subsystems
                  `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))))
       (service spice-vdagent-service-type)
-      (service containerd-service-type)
-      (service docker-service-type)
-      (service virtlog-service-type
-               (virtlog-configuration (max-clients 1000)))
-      )
+      (service containerd-service-type))
 
      ;; This is the default list of services
      ;; we are appending to.
      %base-services))
 
    (bootloader (bootloader-configuration
-                (bootloader grub-efi-bootloader)
-                (targets (list "/boot/efi"))
-                (keyboard-layout keyboard-layout)))
+                 (bootloader grub-efi-bootloader)
+                 (targets (list "/boot/efi"))
+                 (keyboard-layout keyboard-layout)))
    (swap-devices (list (swap-space
-                        (target (file-system-label "swap")))))
+                         (target (file-system-label "swap")))))
 
    ;; The list of file systems that get "mounted".  The unique
    ;; file system identifiers there ("UUIDs") can be obtained
    ;; by running 'blkid' in a terminal.
    (file-systems (cons* (file-system
-                         (mount-point "/home")
-                         (device (file-system-label "my-home"))
-                         (type "ext4"))
+                          (mount-point "/home")
+                          (device (file-system-label "my-home"))
+                          (type "ext4"))
                         (file-system
-                         (mount-point "/")
-                         (device (file-system-label "my-root"))
-                         (type "ext4"))
+                          (mount-point "/")
+                          (device (file-system-label "my-root"))
+                          (type "ext4"))
                         (file-system
-                         (mount-point "/boot/efi")
-                         (device (uuid "25E4-BEAB"
-                                       'fat32))
-                         (type "vfat"))
+                          (mount-point "/boot/efi")
+                          (device (file-system-label "boot-efi"))
+                          (type "vfat"))
                         %base-file-systems))))
 
 (define %system-log-message-destination
@@ -155,15 +150,15 @@
    'garbage-collection
    (lambda _
      (shepherd-service
-      (provision '(gc))
-      (requirement '(user-processes guix-daemon))
-      (start #~(make-timer-constructor
-                (calendar-event #:minutes '(12))
-                (command
-                 '("/run/current-system/profile/bin/guix" "gc" "-F2G"))
-                #:wait-for-termination? #t))
-      (stop #~(make-timer-constructor))
-      (actions (list shepherd-trigger-action))))
+       (provision '(gc))
+       (requirement '(user-processes guix-daemon))
+       (start #~(make-timer-constructor
+                 (calendar-event #:minutes '(12))
+                 (command
+                  '("/run/current-system/profile/bin/guix" "gc" "-F2G"))
+                 #:wait-for-termination? #t))
+       (stop #~(make-timer-constructor))
+       (actions (list shepherd-trigger-action))))
    #t
    (description "Periodically collect garbage.")))
 
@@ -183,5 +178,5 @@
                           ;; that of the disk image.
                           (let ((root-size (- size (* 50 (expt 2 20)))))
                             (list (partition
-                                   (inherit root)
-                                   (size root-size))))))))))
+                                    (inherit root)
+                                    (size root-size))))))))))
