@@ -62,7 +62,9 @@
         "guile"
         "guile-readline"
         "guile-colorized"
-        "guile-hall"))
+        "guile-hall"
+        "guile-fibers"
+        "guile-git"))
 
 (define %emacs-for-c
   (list "binutils"

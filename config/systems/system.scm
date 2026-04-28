@@ -66,6 +66,7 @@
   #:use-module (config systems base-system)
   #:use-module (config services i2pd)
   #:use-module (config services auto-mirror)
+  #:use-module (config services shepherd)
   #:use-module (config packages tor)
   #:use-module (config packages mail)
   #:use-module (srfi srfi-19))
@@ -97,7 +98,11 @@
                           "ibus-rime"
                           "ibus-libpinyin"
                           "dconf"
-                          "font-adobe-source-han-sans"))
+                          "font-adobe-source-han-sans"
+                          "guile"
+                          "guile-git"
+                          "guile-bytestructures"
+                          "libgit2"))
                    %base-packages))
 
  ;; Below is the list of system services.  To search for available
@@ -105,6 +110,7 @@
  (services
   (append
    (list
+    (service shepherd-repl-service-type)
     (service shared-cache-service-type
              (shared-cache-configuration
               (users (list (user-cache (user "stalk"))))))
