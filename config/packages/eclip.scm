@@ -1,3 +1,19 @@
+;;  guix.scm --- Pakcgae define.
+;; Copyright (C) 2026  Stalk Evolto <stalk@stalk-laptop>
+
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 (define-module (config packages eclip)
   #:use-module (guix packages)
   #:use-module (guix build-system emacs)
@@ -10,6 +26,7 @@
   #:use-module (gnu packages emacs-xyz)
   #:use-module (gnu packages guile)
   #:use-module (gnu packages guile-xyz)
+  #:use-module (gnu packages python-xyz)
   #:use-module (gnu packages commencement)
   #:use-module (gnu packages llvm)
   #:use-module (gnu packages gdb)
@@ -18,7 +35,7 @@
 (define-public emacs-eclip
 (package
   (name "emacs-eclip")
-  (version "1.0.1-alpha")
+  (version "1.0.1-rc")
   (source
    (origin
      (method git-fetch)
@@ -27,7 +44,7 @@
 	   (commit (string-append "v" version))))
      (file-name (git-file-name name version))
      (sha256
-      (base32 "0cirhd51xv5gxhmzalnz4pr04da1yhjhknf2pnn0sgnn11ijhn95"))))
+      (base32 "0z3wnw6l9iv2vyi1bcsadid2bzxsrxqlqa1dizpsvc3d9hcmrnkw"))))
   (native-inputs
    (list emacs))
 
@@ -41,12 +58,15 @@
 	 emacs-paredit
 	 emacs-oauth2
 	 emacs-yaml
+         emacs-markdown-mode
+         python-markdown
 	 guile-3.0-latest
 	 guile-readline
 	 guile-colorized
 	 gcc-toolchain
 	 gdb
-	 clang))
+	 clang
+         python-lsp-server))
   (build-system emacs-build-system)
   (arguments
    (list
