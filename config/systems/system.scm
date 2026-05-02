@@ -72,112 +72,187 @@
   #:use-module (srfi srfi-19))
 
 (operating-system
- (inherit %base-system)
- (kernel linux)
- (initrd microcode-initrd)
- (firmware (list linux-firmware))
- (locale "en_US.utf8")
- (timezone "Asia/Shanghai")
- (keyboard-layout (keyboard-layout "us"))
- (host-name "stalk-laptop")
+  (inherit %base-system)
+  (kernel linux)
+  (initrd microcode-initrd)
+  (firmware (list linux-firmware))
+  (locale "en_US.utf8")
+  (timezone "Asia/Shanghai")
+  (keyboard-layout (keyboard-layout "us"))
+  (host-name "stalk-laptop")
 
- ;; The list of user accounts ('root' is implicit).
- (users (cons* (user-account
-                (name "stalk")
-                (comment "Stalk")
-                (group "users")
-                (home-directory "/home/stalk")
-                (supplementary-groups '("wheel" "netdev" "audio" "video"
-                                        "libvirt"))) %base-user-accounts))
+  ;; The list of user accounts ('root' is implicit).
+  (users (cons* (user-account
+                 (name "stalk")
+                 (comment "Stalk")
+                 (group "users")
+                 (home-directory "/home/stalk")
+                 (supplementary-groups '("wheel" "netdev" "audio" "video"
+                                         "libvirt")))
+                (user-account
+                 (name "vmail")
+                 (group "vmail")
+                 (home-directory "/home/vmail")) %base-user-accounts))
+  (groups (cons* (user-group (name "vmail")) %base-groups))
 
- ;; Packages installed system-wide.  Users can also install packages
- ;; under their own account: use 'guix search KEYWORD' to search
- ;; for packages and 'guix install PACKAGE' to install a package.
- (packages (append (map specification->package
-                        '("ibus"
-                          "ibus-rime"
-                          "ibus-libpinyin"
-                          "dconf"
-                          "font-adobe-source-han-sans"
-                          "guile"
-                          "guile-git"
-                          "guile-bytestructures"
-                          "libgit2"))
-                   %base-packages))
+  ;; Packages installed system-wide.  Users can also install packages
+  ;; under their own account: use 'guix search KEYWORD' to search
+  ;; for packages and 'guix install PACKAGE' to install a package.
+  (packages (append (map specification->package
+                         '("ibus"
+                           "ibus-rime"
+                           "ibus-libpinyin"
+                           "dconf"
+                           "font-adobe-source-han-sans"
+                           "guile"
+                           "guile-git"
+                           "guile-bytestructures"
+                           "libgit2"))
+                    %base-packages))
 
- ;; Below is the list of system services.  To search for available
- ;; services, run 'guix system search KEYWORD' in a terminal.
- (services
-  (append
-   (list
-    (service shepherd-repl-service-type)
-    (service shared-cache-service-type
-             (shared-cache-configuration
-              (users (list (user-cache (user "stalk"))))))
-    (service gnome-desktop-service-type)
-    (service file-database-service-type)
-    (service package-database-service-type)
+  ;; Below is the list of system services.  To search for available
+  ;; services, run 'guix system search KEYWORD' in a terminal.
+  (services
+   (append
+    (list
+     (service shepherd-repl-service-type)
+     (service shared-cache-service-type
+              (shared-cache-configuration
+               (users (list (user-cache (user "stalk"))))))
+     (service gnome-desktop-service-type)
+     (service file-database-service-type)
+     (service package-database-service-type)
 
-    (service dnsmasq-service-type
-             (dnsmasq-configuration
-              (no-resolv? #t)
-              (servers '("192.168.1.1" "::1" "8.8.8.8"))))
+     (service dnsmasq-service-type
+              (dnsmasq-configuration
+               (no-resolv? #t)
+               (servers '("192.168.1.1" "::1" "8.8.8.8"))))
 
-    ;; To configure OpenSSH, pass an 'openssh-configuration'
-    ;; record as a second argument to 'service' below.
-    (service openssh-service-type
-             (openssh-configuration
-              (permit-root-login 'prohibit-password)
-              (password-authentication? #f)
-              (accepted-environment '("COLORTERM"))
-              (subsystems
-               `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))
-              (authorized-keys
-               `(("stalk" ,(local-file "/home/stalk/keys/stalk.pub"))
-                 ("root" ,(local-file "/root/keys/stalk.pub"))))))
-    (service guix-publish-service-type
-             (guix-publish-configuration
-              (port 80)
-              (advertise? #t)
-              (cache "/var/cache/guix/publish")
-              (ttl 432000)))
+     ;; To configure OpenSSH, pass an 'openssh-configuration'
+     ;; record as a second argument to 'service' below.
+     (service openssh-service-type
+              (openssh-configuration
+               (permit-root-login 'prohibit-password)
+               (password-authentication? #f)
+               (accepted-environment '("COLORTERM"))
+               (subsystems
+                `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))
+               (authorized-keys
+                `(("stalk" ,(local-file "/home/stalk/keys/stalk.pub"))
+                  ("root" ,(local-file "/root/keys/stalk.pub"))))))
+     (service guix-publish-service-type
+              (guix-publish-configuration
+               (port 80)
+               (advertise? #t)
+               (cache "/var/cache/guix/publish")
+               (ttl 432000)))
 
-    (service git-daemon-service-type
-             (git-daemon-configuration
-              (whitelist '("/srv/git"))))
-    (service update-git-mirror-service-type)
-    (service git-ssh-service-type
-             `(("git" ,(local-file "/home/stalk/keys/qin_rixiang.pub")
-                      ,(local-file "/home/stalk/keys/stalk-win.pub"))))
-    ;; (service cgit-service-type)
+     (service git-daemon-service-type
+              (git-daemon-configuration
+               (whitelist '("/srv/git"))))
+     (service update-git-mirror-service-type)
+     (service git-ssh-service-type
+              `(("git" ,(local-file "/home/stalk/keys/qin_rixiang.pub")
+                 ,(local-file "/home/stalk/keys/stalk-win.pub"))))
+     ;; (service cgit-service-type)
 
-    ;; (service fcgiwrap-service-type)
-    ;; (service nginx-service-type
-    ;;          (nginx-configuration
-    ;;           (server-blocks
-    ;;            (list
-    ;;             (nginx-server-configuration
-    ;;              (listen '("443 ssl"))
-    ;;              (server-name "localhost:9418")
-    ;;              (ssl-certificate
-    ;;               "/etc/certs/git.stalk-evolto.org/fullchain.pem")
-    ;;              (ssl-certificate-key
-    ;;               "/etc/certs/git.stalk-evolto.org/privkey.pem")
-    ;;              (locations
-    ;;               (list
-    ;;                (git-http-nginx-location-configuration
-    ;;                 (git-http-configuration (uri-path "/"))))))))))
-    ;; (service certbot-service-type)
+     ;; (service fcgiwrap-service-type)
+     ;; (service nginx-service-type
+     ;;          (nginx-configuration
+     ;;           (server-blocks
+     ;;            (list
+     ;;             (nginx-server-configuration
+     ;;              (listen '("443 ssl"))
+     ;;              (server-name "localhost:9418")
+     ;;              (ssl-certificate
+     ;;               "/etc/certs/git.stalk-evolto.org/fullchain.pem")
+     ;;              (ssl-certificate-key
+     ;;               "/etc/certs/git.stalk-evolto.org/privkey.pem")
+     ;;              (locations
+     ;;               (list
+     ;;                (git-http-nginx-location-configuration
+     ;;                 (git-http-configuration (uri-path "/"))))))))))
+     ;; (service certbot-service-type)
 
-    (service dovecot-service-type
-             (dovecot-configuration
-               (dovecot dovecot-latest)
-               (mail-location "maildir:~/.mail")
+     (service dovecot-service-type
+              (dovecot-configuration
+               (mail-location "maildir:/var/vmail/%d/%n")
+               (auth-verbose? #t)
+               (auth-mechanisms '("plain" "login"))
+               (ssl? "no")
+               (disable-plaintext-auth? #f)
+               (log-path "/var/log/dovecot.log")
+               (info-log-path "/var/log/dovecot-info.log")
                (protocols
                 (list (protocol-configuration
-                        (name "imap"))
+                       (name "imap"))
                       (protocol-configuration
-                        (name "lmtp"))))))
+                       (name "lmtp"))))
+               (services
+                (list
+                 (service-configuration
+                  (kind "imap-login")
+                  (client-limit 0)
+                  (process-limit 0)
+                  (listeners
+                   (list
+                    (inet-listener-configuration (protocol "imap") (port 143) (ssl? #f))
+                    (inet-listener-configuration (protocol "imaps") (port 993) (ssl? #t)))))
+                 (service-configuration
+                  (kind "pop3-login")
+                  (listeners
+                   (list
+                    (inet-listener-configuration (protocol "pop3") (port 110) (ssl? #f))
+                    (inet-listener-configuration (protocol "pop3s") (port 995) (ssl? #t)))))
+                 (service-configuration
+                  (kind "lmtp")
+                  (client-limit 1)
+                  (process-limit 0)
+                  (listeners
+                   (list (unix-listener-configuration (path "lmtp")
+                                                      (mode "0666")
+                                                      (user "exim")
+                                                      (group "exim")))))
+                 (service-configuration
+                  (kind "imap")
+                  (client-limit 1)
+                  (process-limit 1024))
+                 (service-configuration
+                  (kind "pop3")
+                  (client-limit 1)
+                  (process-limit 1024))
+                 (service-configuration
+                  (kind "auth")
+                  (service-count 0)
+                  (client-limit 0)
+                  (process-limit 1)
+                  (listeners
+                   (list (unix-listener-configuration (path "auth-userdb")
+                                                      (user "dovecot")
+                                                      (group "dovecot"))
+                         (unix-listener-configuration (path "auth-client")
+                                                      (mode "0660")
+                                                      (user "exim")
+                                                      (group "exim")))))
+                 (service-configuration
+                  (kind "auth-worker")
+                  (client-limit 1)
+                  (process-limit 0))
+                 (service-configuration
+                  (kind "dict")
+                  (client-limit 1)
+                  (process-limit 0)
+                  (listeners (list (unix-listener-configuration (path "dict")))))))
+               (passdbs (list
+                         (passdb-configuration
+                          (driver "passwd-file")
+                          (args '("/etc/dovecot/passwd")))))
+               (userdbs (list
+                         (userdb-configuration
+                          (driver "static")
+                          (args '("uid=vmail"
+                                  "gid=vmail"
+                                  "home=/var/vmail/%u")))))))
 
     (service exim-service-type
              (exim-configuration
@@ -185,7 +260,9 @@
               (config-file (local-file "/etc/exim.conf"))))
 
     (service mail-aliases-service-type
-             '(("postmaster" "stalk")))
+             '(("postmaster" "stalk")
+               ("abuse" "stalk")
+               ("webmaster" "stalk")))
 
     (service pounce-service-type
              (pounce-configuration
