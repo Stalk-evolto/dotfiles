@@ -43,13 +43,13 @@
   (package
    (inherit tor)
    (name "tor-latest")
-   (version "tor-0.5.0.0-alpha-dev")
+   (version "0.5.0.0-alpha-dev")
    (source
     (origin
      (method git-fetch)
      (uri (git-reference
            (url "git://localhost/tor.git")
-           (commit version)))
+           (commit (string-append "tor-" version))))
      (file-name (git-file-name name version))
      (sha256
       (base32 "1nmrpk5pnydiawk6hp31ibkwb50yzh8d6jyi9g9iz8ymx1n4xy8q"))))
@@ -139,13 +139,13 @@
   (package
    (inherit go-gitlab-torproject-org-tpo-anti-censorship-pluggable-transports-webtunnel)
    (name "webtunnel")
-   (version "v0.0.4")
+   (version "0.0.4")
    (source
     (origin
      (method git-fetch)
      (uri (git-reference
            (url "git://localhost/webtunnel.git")
-           (commit version)))
+           (commit (string-append "v" version))))
      (file-name (git-file-name name version))
      (sha256
       (base32 "07l9i361n0kglcda86gl4m0iciy8qygzgavgbknxf33fzkdslifk"))))

@@ -48,6 +48,7 @@
   #:use-module (gnu services desktop)
   #:use-module (gnu services dns)
   #:use-module (gnu services docker)
+  #:use-module (gnu services containers)
   #:use-module (gnu services guix)
   #:use-module (gnu services messaging)
   #:use-module (gnu services monitoring)
@@ -179,8 +180,6 @@
                (mail-location "maildir:/var/vmail/%d/%n")
                (auth-verbose? #t)
                (auth-mechanisms '("plain" "login"))
-               (ssl? "no")
-               (disable-plaintext-auth? #f)
                (log-path "/var/log/dovecot.log")
                (info-log-path "/var/log/dovecot-info.log")
                (protocols
@@ -245,14 +244,14 @@
                   (listeners (list (unix-listener-configuration (path "dict")))))))
                (passdbs (list
                          (passdb-configuration
-                          (driver "passwd-file")
-                          (args '("/etc/dovecot/passwd")))))
+                          (driver "sql")
+                          (args
+                           '("/etc/dovecot/dovecot-sql.conf.ext")))))
                (userdbs (list
                          (userdb-configuration
-                          (driver "static")
-                          (args '("uid=vmail"
-                                  "gid=vmail"
-                                  "home=/var/vmail/%u")))))))
+                          (driver "sql")
+                          (args
+                           '("/etc/dovecot/dovecot-sql.conf.ext")))))))
 
     (service exim-service-type
              (exim-configuration
@@ -272,50 +271,24 @@
               (sasl-external? #t)
               (nick "stalk")
               (join (list "#gnu" "#guix" "#guile" "#hurd" "#fossjobs"))))
-    (service jami-service-type
-             (jami-configuration
-              (accounts
-               (list (jami-account
-                      (archive "/etc/jami/unencrypted-account-1.gz"))))))
+
     (service spice-vdagent-service-type)
     (service containerd-service-type)
-    (service docker-service-type)
     (service mysql-service-type
              (mysql-configuration
-              (bind-address "0.0.0.0")
+              (bind-address "127.0.0.1")
               (extra-content
                `(string-append "basedir=" ,mariadb))
               (extra-environment #~'("HOSTNAME='stalk-evolto'"))
               (auto-upgrade? #f)))
     (service redis-service-type)
-    ;;     (service nftables-service-type
-    ;;              (nftables-configuration
-    ;;               (ruleset (plain-file "nftables.conf" "\
-    ;; # A Simple ruleset for a workstation
-    ;; table inet filter {
-    ;;   chain input {
-    ;;     type filter hook input priority 0; policy drop;
+    (service nftables-service-type
+             (nftables-configuration
+               (ruleset (local-file "aux-files/nftables.conf"))))
 
-    ;;     # accept any localhost traffic
-    ;;     iif lo accept
-
-    ;;     # accept traffic originated from us
-    ;;     ct state established,related accept
-
-    ;;     # accept neighbour discovery otherwise IPv6 connectivity breaks
-    ;;     icmpv6 type { nd-neighbor-solicit, nd-router-advert, nd-neighbor-advert } accept
-
-    ;;     # Allow SSH on port TCP/22 and allow HTTP(s) TCP/80 and TCP/443
-    ;;     # for IPV4 and IPV6
-    ;;     tcp dport { 22, 80, 443 } accept
-
-    ;;    }
-    ;; }
-    ;; "))))
-
-    ;; (service darkstat-service-type
-    ;;          (darkstat-configuration
-    ;;           (interface "wlo1")))
+    (service darkstat-service-type
+             (darkstat-configuration
+              (interface "wlo1")))
 
     (service i2pd-service-type
              (i2pd-configuration
@@ -374,7 +347,14 @@ keys = transient-tg-mtproxy"))))
                                  (18089 "127.0.0.1:18089"))))
 		     (tor-onion-service-configuration
 		      (name "blog")
-		      (mapping '((8080 "127.0.0.1:8080"))))))
+		      (mapping '((8080 "127.0.0.1:8080"))))
+                     (tor-onion-service-configuration
+                      (name "mail")
+                      (mapping '((143 "127.0.0.1:143")
+                                 (993 "127.0.0.1:993")
+                                 (110 "127.0.0.1:110")
+                                 (995 "127.0.0.1:995")
+                                 (25 "127.0.0.1:25"))))))
               (transport-plugins
                (list (tor-transport-plugin
                       (protocol "webtunnel")

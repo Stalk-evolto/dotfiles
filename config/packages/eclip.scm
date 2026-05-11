@@ -35,7 +35,7 @@
 (define-public emacs-eclip
 (package
   (name "emacs-eclip")
-  (version "1.0.1-rc")
+  (version "1.0.1-alpha")
   (source
    (origin
      (method git-fetch)
@@ -44,7 +44,7 @@
 	   (commit (string-append "v" version))))
      (file-name (git-file-name name version))
      (sha256
-      (base32 "0z3wnw6l9iv2vyi1bcsadid2bzxsrxqlqa1dizpsvc3d9hcmrnkw"))))
+      (base32 "0kp2n8f14cmxrv3ip672lic65rhm15876pn72f2v9q8zw85bf9gh"))))
   (native-inputs
    (list emacs))
 
@@ -59,6 +59,7 @@
 	 emacs-oauth2
 	 emacs-yaml
          emacs-markdown-mode
+         emacs-nftables-mode
          python-markdown
 	 guile-3.0-latest
 	 guile-readline
