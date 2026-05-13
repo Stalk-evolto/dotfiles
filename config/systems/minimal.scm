@@ -36,18 +36,21 @@
   #:use-module (gnu packages networking)
   #:use-module (gnu packages ssh)
   #:use-module (gnu packages xml)
+  #:use-module (gnu packages version-control)
   #:use-module (gnu packages less)
   #:use-module (gnu packages man)
   #:use-module (gnu packages texinfo)
   #:use-module (gnu packages admin)
   #:use-module (gnu packages guile)
   #:use-module (gnu packages guile-xyz)
+  #:use-module (gnu packages golang-web)
   #:use-module (gnu image)
   #:use-module (guix records)
   #:use-module (guix gexp)
   #:use-module (gnu services)
   #:use-module (gnu services shepherd)
   #:use-module (gnu services admin)
+  #:use-module (gnu services avahi)
   #:use-module (gnu services cups)
   #:use-module (gnu services monitoring)
   #:use-module (gnu services networking)
@@ -62,7 +65,8 @@
   #:use-module (gnu system file-systems)
   #:use-module ((srfi srfi-1) #:hide (partition))
   #:use-module (ice-9 match)
-  #:use-module (config packages eclip))
+  #:use-module (config packages eclip)
+  #:use-module (config packages tor))
 
 (define %minimal-system
   (operating-system
@@ -80,7 +84,7 @@
     ;; under their own account: use 'guix search KEYWORD' to search
     ;; for packages and 'guix install PACKAGE' to install a package.
     (packages (append
-               (list less emacs emacs-eclip
+               (list less emacs emacs-eclip git
                      man-db
                      info-reader
                      kbd
@@ -97,23 +101,60 @@
       (list
        (service openssh-service-type
                 (openssh-configuration
-                 (permit-root-login 'prohibit-password)
-                 (password-authentication? #f)
-                 (authorized-keys
-                  `(("root"
-                     ,(local-file
-                       "/home/stalk/Downloads/stalk-phone.pub"))))
-                 (subsystems
-                  `(("sftp" ,(file-append openssh "/libexec/sftp-server")))))))
+                  (permit-root-login 'prohibit-password)
+                  (password-authentication? #f)
+                  (authorized-keys
+                   `(("root"
+                      ,(local-file
+                        "/home/stalk/Downloads/stalk-phone.pub"))))
+                  (subsystems
+                   `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))))
+
+       (service tor-service-type
+                (tor-configuration
+                  (tor tor-latest)
+                  (socks-socket-type 'tcp)
+                  (config-file (plain-file "torrc"
+                                           "\
+ClientOnly 1
+ClientUseIPv4 1
+ClientUseIPv6 1
+ClientAutoIPv6ORPort 1
+HTTPTunnelPort 8118
+
+UseBridges 1
+
+Bridge obfs4 [2a01:4f9:3070:2c54::122]:8088 7F6051103D00F6E6615C5C8D92C4B648B32331D3 cert=DQ6XOkBQSY424G3SVbOQH5R5aQuWWaCgSI6jv4q7LnI+0h/fJHv4cPX1TMHoY2zD2FUwdQ iat-mode=0
+Bridge obfs4 [2a02:ed80:2:1:f816:3eff:feb2:5071]:80 603E097C20A893FA76E997E0AE2079C9F5963818 cert=NPHT6yNMUpZCNOv0ISbingHg3Os3xe/lymPDkLx2cjzu/VptmoFIUsKyRm/aHLS17Kmraw iat-mode=0
+Bridge webtunnel [2001:db8:addf:7bc4:155a:a563:a5d5:8b04]:443 F799A0A458365388600F54BD44A99B5887D54911 url=https://aaronstory2026.xyz:2053/vicmackey ver=0.0.4
+Bridge webtunnel [2001:db8:fbfa:48b4:5520:53e6:24b4:eca0]:443 93807A85521915D7D2BA17725C08AC39035D1741 url=https://web.localenby.is/HmlgNcBbNgRJw862bJVxZRes ver=0.0.3
+"))
+                  (transport-plugins
+                   (list (tor-transport-plugin
+                           (protocol "webtunnel")
+                           (program (file-append webtunnel "/bin/client")))
+                         (tor-transport-plugin
+                           (protocol "obfs4")
+                           (program (file-append lyrebird "/bin/lyrebird")))))))
+
+       (service avahi-service-type))
+
       (modify-services %base-services
         (static-networking-service-type
          networks =>
          (list %loopback-static-networking
-               %qemu-static-networking)))))
+               %qemu-static-networking))
+
+        (guix-service-type
+         config =>
+         (guix-configuration
+          (inherit config)
+          (discover? #t)
+          (http-proxy "http://localhost:8118"))))))
 
    (bootloader (bootloader-configuration
-                 (bootloader grub-efi-bootloader)
-                 (targets (list "/boot/efi"))
+                 (bootloader grub-bootloader)
+                 (targets (list "/dev/sda"))
                  (keyboard-layout keyboard-layout)))
 
    ;; The list of file systems that get "mounted".  The unique

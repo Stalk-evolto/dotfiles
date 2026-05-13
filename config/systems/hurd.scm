@@ -19,10 +19,12 @@
 (define-module (config systems hurd)
   #:use-module (gnu)
   #:use-module (gnu system hurd)
+  #:use-module (gnu services virtualization)
+  #:use-module (gnu services ssh)
+  #:use-module (gnu packages hurd)
+  #:use-module (gnu packages ssh)
+  #:use-module (gnu packages emacs)
   #:export (%childhurd-os))
-
-(use-service-modules virtualization ssh)
-(use-package-modules hurd ssh emacs)
 
 (define %childhurd-os
   (operating-system
