@@ -15,9 +15,12 @@
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 (define-module (config services)
+  #:use-module (guix gexp)
   #:use-module (gnu services)
   #:use-module (srfi srfi-1)
-  #:export (append-service-extensions))
+  #:use-module (ice-9 textual-ports)
+  #:export (append-service-extensions
+            onion-service-domains))
 
 (define (append-service-extensions type lst)
    "Return TYPE, a service type, involve the service extensions
@@ -26,3 +29,11 @@ targeting one of the types in LST."
      (inherit type)
      (extensions (append lst
                          (service-type-extensions type)))))
+
+;; (define (onion-service-domains service)
+;;   "Return String, the onion service domains."
+;;   #~(begin
+;;       (use-modules (ice-9 textual-ports))
+;;     (call-with-input-file
+;;        (string-append "/var/lib/tor/hidden-services/" #$service "/hostname")
+;;       get-line)))

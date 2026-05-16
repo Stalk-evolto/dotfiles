@@ -36,6 +36,7 @@
   #:use-module (config systems base-system)
   #:use-module (config systems hurd)
   #:use-module (config systems mail-server)
+  #:use-module (config systems web-server)
   #:use-module (gnu packages databases)
   #:use-module (gnu packages golang-web)
   #:use-module (gnu packages ssh)
@@ -139,39 +140,17 @@
                (authorized-keys
                 `(("stalk" ,(local-file "/home/stalk/keys/stalk.pub"))
                   ("root" ,(local-file "/root/keys/stalk.pub"))))))
-     (service guix-publish-service-type
-              (guix-publish-configuration
-               (port 80)
-               (advertise? #t)
-               (cache "/var/cache/guix/publish")
-               (ttl 432000)))
+     ;; (service guix-publish-service-type
+     ;;          (guix-publish-configuration
+     ;;           (port 80)
+     ;;           (advertise? #t)
+     ;;           (cache "/var/cache/guix/publish")
+     ;;           (ttl 432000)))
 
-     (service git-daemon-service-type
-              (git-daemon-configuration
-               (whitelist '("/srv/git"))))
      ;; (service update-git-mirror-service-type)
      (service git-ssh-service-type
               `(("git" ,(local-file "/home/stalk/keys/qin_rixiang.pub")
                  ,(local-file "/home/stalk/keys/stalk-win.pub"))))
-     ;; (service cgit-service-type)
-
-     ;; (service fcgiwrap-service-type)
-     ;; (service nginx-service-type
-     ;;          (nginx-configuration
-     ;;           (server-blocks
-     ;;            (list
-     ;;             (nginx-server-configuration
-     ;;              (listen '("443 ssl"))
-     ;;              (server-name "localhost:9418")
-     ;;              (ssl-certificate
-     ;;               "/etc/certs/git.stalk-evolto.org/fullchain.pem")
-     ;;              (ssl-certificate-key
-     ;;               "/etc/certs/git.stalk-evolto.org/privkey.pem")
-     ;;              (locations
-     ;;               (list
-     ;;                (git-http-nginx-location-configuration
-     ;;                 (git-http-configuration (uri-path "/"))))))))))
-     ;; (service certbot-service-type)
 
     (service pounce-service-type
              (pounce-configuration
@@ -317,6 +296,8 @@ guest only = yes\n"))))
     (set-xorg-configuration
      (xorg-configuration (keyboard-layout keyboard-layout))))
 
+    %web-server-services
+
     (modify-services %mail-server-services
       (mail-aliases-service-type config => '(("postmaster" "stalk")
                                              ("abuse" "stalk")
@@ -326,6 +307,6 @@ guest only = yes\n"))))
     ;; we are appending to.
     (modify-services %desktop-services
       (guix-service-type config => (guix-configuration
-                                     (inherit config)
-                                     (discover? #t)
-                                     (http-proxy "http://localhost:8118")))))))
+                                    (inherit config)
+                                    (discover? #t)
+                                    (http-proxy "http://localhost:8118")))))))

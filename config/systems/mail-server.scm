@@ -55,12 +55,6 @@
           (create-home-directory? #f)
           (shell (file-append shadow "/sbin/nologin")))))
 
-(define (onion-service-domains service)
-  "Return String, the onion service domains."
-  (call-with-input-file
-      (string-append "/var/lib/tor/hidden-services/" service "/hostname")
-    get-line))
-
 (define (%mail-activation config)
   (let ((public-key "/etc/cert/mail/fullchain.pem")
         (private-key "/etc/cert/mail/privkey.pem"))
