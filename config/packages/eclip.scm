@@ -35,7 +35,7 @@
 (define-public emacs-eclip
 (package
   (name "emacs-eclip")
-  (version "1.0.1-alpha")
+  (version "1.0.1-beta")
   (source
    (origin
      (method git-fetch)
@@ -44,7 +44,7 @@
 	   (commit (string-append "v" version))))
      (file-name (git-file-name name version))
      (sha256
-      (base32 "0kp2n8f14cmxrv3ip672lic65rhm15876pn72f2v9q8zw85bf9gh"))))
+      (base32 "1zjc2pylkb8w70xxp329zspnwg9np0m4y85jap67n14nxh7angx5"))))
   (native-inputs
    (list emacs))
 
@@ -55,6 +55,8 @@
 	 emacs-geiser-guile
          emacs-ellama
          emacs-telega
+         emacs-auctex
+         emacs-cdlatex
 	 emacs-paredit
 	 emacs-oauth2
 	 emacs-yaml

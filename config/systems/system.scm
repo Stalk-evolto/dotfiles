@@ -28,48 +28,49 @@
 ;; Indicate which modules to import to access the variables
 ;; used in this configuration.
 (define-module (config systems system)
-  #:use-module (gnu)
-  #:use-module (gnu packages)
-  #:use-module (guix store)
-  #:use-module (guix packages)
-  #:use-module (guix least-authority)
-  #:use-module (nongnu packages linux)
-  #:use-module (nongnu system linux-initrd)
+  #:use-module (config packages mail)
+  #:use-module (config packages tor)
+  #:use-module (config services auto-mirror)
+  #:use-module (config services i2pd)
+  #:use-module (config services shepherd)
+  #:use-module (config systems base-system)
+  #:use-module (config systems hurd)
+  #:use-module (config systems mail-server)
   #:use-module (gnu packages databases)
   #:use-module (gnu packages golang-web)
   #:use-module (gnu packages ssh)
   #:use-module (gnu packages xml)
-  #:use-module (gnu services mail)
-  #:use-module (gnu services getmail)
+  #:use-module (gnu packages)
   #:use-module (gnu services admin)
-  #:use-module (gnu services cups)
+  #:use-module (gnu services base)
   #:use-module (gnu services cgit)
+  #:use-module (gnu services containers)
+  #:use-module (gnu services cups)
   #:use-module (gnu services databases)
   #:use-module (gnu services desktop)
   #:use-module (gnu services dns)
+  #:use-module (gnu services dns)
   #:use-module (gnu services docker)
-  #:use-module (gnu services containers)
+  #:use-module (gnu services getmail)
   #:use-module (gnu services guix)
+  #:use-module (gnu services mail)
   #:use-module (gnu services messaging)
   #:use-module (gnu services monitoring)
   #:use-module (gnu services networking)
   #:use-module (gnu services samba)
   #:use-module (gnu services spice)
   #:use-module (gnu services ssh)
-  #:use-module (gnu services dns)
   #:use-module (gnu services telephony)
   #:use-module (gnu services version-control)
   #:use-module (gnu services virtualization)
   #:use-module (gnu services web)
   #:use-module (gnu services xorg)
-  #:use-module (gnu services base)
-  #:use-module (config systems hurd)
-  #:use-module (config systems base-system)
-  #:use-module (config services i2pd)
-  #:use-module (config services auto-mirror)
-  #:use-module (config services shepherd)
-  #:use-module (config packages tor)
-  #:use-module (config packages mail)
+  #:use-module (gnu)
+  #:use-module (guix least-authority)
+  #:use-module (guix packages)
+  #:use-module (guix store)
+  #:use-module (nongnu packages linux)
+  #:use-module (nongnu system linux-initrd)
   #:use-module (srfi srfi-19))
 
 (operating-system
@@ -89,12 +90,9 @@
                  (group "users")
                  (home-directory "/home/stalk")
                  (supplementary-groups '("wheel" "netdev" "audio" "video"
-                                         "libvirt")))
-                (user-account
-                 (name "vmail")
-                 (group "vmail")
-                 (home-directory "/home/vmail")) %base-user-accounts))
-  (groups (cons* (user-group (name "vmail")) %base-groups))
+                                         "libvirt" "mail")))
+                %base-user-accounts))
+  (groups %base-groups)
 
   ;; Packages installed system-wide.  Users can also install packages
   ;; under their own account: use 'guix search KEYWORD' to search
@@ -151,7 +149,7 @@
      (service git-daemon-service-type
               (git-daemon-configuration
                (whitelist '("/srv/git"))))
-     (service update-git-mirror-service-type)
+     ;; (service update-git-mirror-service-type)
      (service git-ssh-service-type
               `(("git" ,(local-file "/home/stalk/keys/qin_rixiang.pub")
                  ,(local-file "/home/stalk/keys/stalk-win.pub"))))
@@ -174,94 +172,6 @@
      ;;                (git-http-nginx-location-configuration
      ;;                 (git-http-configuration (uri-path "/"))))))))))
      ;; (service certbot-service-type)
-
-     (service dovecot-service-type
-              (dovecot-configuration
-               (mail-location "maildir:/var/vmail/%d/%n")
-               (auth-verbose? #t)
-               (auth-mechanisms '("plain" "login"))
-               (log-path "/var/log/dovecot.log")
-               (info-log-path "/var/log/dovecot-info.log")
-               (protocols
-                (list (protocol-configuration
-                       (name "imap"))
-                      (protocol-configuration
-                       (name "lmtp"))))
-               (services
-                (list
-                 (service-configuration
-                  (kind "imap-login")
-                  (client-limit 0)
-                  (process-limit 0)
-                  (listeners
-                   (list
-                    (inet-listener-configuration (protocol "imap") (port 143) (ssl? #f))
-                    (inet-listener-configuration (protocol "imaps") (port 993) (ssl? #t)))))
-                 (service-configuration
-                  (kind "pop3-login")
-                  (listeners
-                   (list
-                    (inet-listener-configuration (protocol "pop3") (port 110) (ssl? #f))
-                    (inet-listener-configuration (protocol "pop3s") (port 995) (ssl? #t)))))
-                 (service-configuration
-                  (kind "lmtp")
-                  (client-limit 1)
-                  (process-limit 0)
-                  (listeners
-                   (list (unix-listener-configuration (path "lmtp")
-                                                      (mode "0666")
-                                                      (user "exim")
-                                                      (group "exim")))))
-                 (service-configuration
-                  (kind "imap")
-                  (client-limit 1)
-                  (process-limit 1024))
-                 (service-configuration
-                  (kind "pop3")
-                  (client-limit 1)
-                  (process-limit 1024))
-                 (service-configuration
-                  (kind "auth")
-                  (service-count 0)
-                  (client-limit 0)
-                  (process-limit 1)
-                  (listeners
-                   (list (unix-listener-configuration (path "auth-userdb")
-                                                      (user "dovecot")
-                                                      (group "dovecot"))
-                         (unix-listener-configuration (path "auth-client")
-                                                      (mode "0660")
-                                                      (user "exim")
-                                                      (group "exim")))))
-                 (service-configuration
-                  (kind "auth-worker")
-                  (client-limit 1)
-                  (process-limit 0))
-                 (service-configuration
-                  (kind "dict")
-                  (client-limit 1)
-                  (process-limit 0)
-                  (listeners (list (unix-listener-configuration (path "dict")))))))
-               (passdbs (list
-                         (passdb-configuration
-                          (driver "sql")
-                          (args
-                           '("/etc/dovecot/dovecot-sql.conf.ext")))))
-               (userdbs (list
-                         (userdb-configuration
-                          (driver "sql")
-                          (args
-                           '("/etc/dovecot/dovecot-sql.conf.ext")))))))
-
-    (service exim-service-type
-             (exim-configuration
-              (package exim-latest)
-              (config-file (local-file "/etc/exim.conf"))))
-
-    (service mail-aliases-service-type
-             '(("postmaster" "stalk")
-               ("abuse" "stalk")
-               ("webmaster" "stalk")))
 
     (service pounce-service-type
              (pounce-configuration
@@ -347,14 +257,7 @@ keys = transient-tg-mtproxy"))))
                                  (18089 "127.0.0.1:18089"))))
 		     (tor-onion-service-configuration
 		      (name "blog")
-		      (mapping '((8080 "127.0.0.1:8080"))))
-                     (tor-onion-service-configuration
-                      (name "mail")
-                      (mapping '((143 "127.0.0.1:143")
-                                 (993 "127.0.0.1:993")
-                                 (110 "127.0.0.1:110")
-                                 (995 "127.0.0.1:995")
-                                 (25 "127.0.0.1:25"))))))
+		      (mapping '((8080 "127.0.0.1:8080"))))))
               (transport-plugins
                (list (tor-transport-plugin
                       (protocol "webtunnel")
@@ -414,10 +317,15 @@ guest only = yes\n"))))
     (set-xorg-configuration
      (xorg-configuration (keyboard-layout keyboard-layout))))
 
-   ;; This is the default list of services
-   ;; we are appending to.
-   (modify-services %desktop-services
-            (guix-service-type config => (guix-configuration
-                (inherit config)
-                (discover? #t)
-                (http-proxy "http://localhost:8118")))))))
+    (modify-services %mail-server-services
+      (mail-aliases-service-type config => '(("postmaster" "stalk")
+                                             ("abuse" "stalk")
+                                             ("webmaster" "stalk"))))
+
+    ;; This is the default list of services
+    ;; we are appending to.
+    (modify-services %desktop-services
+      (guix-service-type config => (guix-configuration
+                                     (inherit config)
+                                     (discover? #t)
+                                     (http-proxy "http://localhost:8118")))))))

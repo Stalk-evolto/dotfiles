@@ -66,7 +66,8 @@
   #:use-module ((srfi srfi-1) #:hide (partition))
   #:use-module (ice-9 match)
   #:use-module (config packages eclip)
-  #:use-module (config packages tor))
+  #:use-module (config packages tor)
+  #:export (%minimal-system))
 
 (define %minimal-system
   (operating-system
@@ -77,12 +78,8 @@
     (keyboard-layout (keyboard-layout "us"))
     (host-name "stalk-virtual")
 
-    ;; The list of user accounts ('root' is implicit).
     (users %base-user-accounts)
 
-    ;; Packages installed system-wide.  Users can also install packages
-    ;; under their own account: use 'guix search KEYWORD' to search
-    ;; for packages and 'guix install PACKAGE' to install a package.
     (packages (append
                (list less emacs emacs-eclip git
                      man-db
@@ -106,7 +103,7 @@
                   (authorized-keys
                    `(("root"
                       ,(local-file
-                        "/home/stalk/Downloads/stalk-phone.pub"))))
+                        "/home/stalk/.ssh/stalk-phone.pub"))))
                   (subsystems
                    `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))))
 
