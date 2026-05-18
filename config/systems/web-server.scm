@@ -10,7 +10,6 @@
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
-
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
@@ -18,6 +17,7 @@
   #:use-module (config services shepherd)
   #:use-module (config services)
   #:use-module (config systems minimal)
+  #:use-module (config services hidden-web)
   #:use-module (gnu services cgit)
   #:use-module (gnu services networking)
   #:use-module (gnu services version-control)
@@ -43,7 +43,7 @@
                     (list
                      (nginx-server-configuration
                        (listen '("unix:/var/run/tor/website.sock"))
-                       ;; (server-name (list (onion-service-domains "website")))
+                       (server-name (list (onion-service-domains "website")))
                        ;; (ssl-certificate
                        ;;  "/etc/certs/git/fullchain.pem")
                        ;; (ssl-certificate-key
@@ -53,7 +53,7 @@
                          (git-http-nginx-location-configuration
                           (git-http-configuration
                             (uri-path "/")
-                            ;; (fcgiwrap-socket "unix:/var/run/fcgiwrap/website.sock")
+                            (fcgiwrap-socket "unix:/var/run/fcgiwrap/website.sock")
                             ))))))))))
                 (description "This is Git http server onion service.")
                 (default-value '())))
@@ -62,16 +62,17 @@
   (list (service git-daemon-service-type
                  (git-daemon-configuration
                    (whitelist '("/srv/git"))))
-        ;; (service cgit-service-type
-        ;;          (cgit-configuration
-        ;;            (nginx (list (nginx-server-configuration)))))
+        (service cgit-service-type
+                 ;; (cgit-configuration
+                 ;;  (nginx (list (nginx-server-configuration
+                 ;;                (listen '("unix:/var/run/tor/website.sock"))))))
+                 )
 
         (service git-http-service-type)
 
         (service fcgiwrap-service-type
-                 ;; (fcgiwrap-configuration
-                 ;;   (socket "unix:/var/run/fcgiwrap/website.sock"))
-                 )
+                 (fcgiwrap-configuration
+                   (socket "unix:/var/run/fcgiwrap/website.sock")))
 
         (service nginx-service-type
                  (nginx-configuration

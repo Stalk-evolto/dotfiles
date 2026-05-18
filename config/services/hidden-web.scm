@@ -1,5 +1,5 @@
-;;  services.scm --- Guix service procedure.
-;; Copyright (C) 2026  Stalk Evolto <stalk@stalk-laptop>
+;;  hidden-web.scm --- Hiddent web server service.
+;; Copyright (C) 2026  System administrator <root@localhost>
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -14,17 +14,19 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-(define-module (config services)
-  #:use-module (guix gexp)
+(define-module (config services hiddent-web)
+  #:use-module (config services)
+  #:use-module (gnu services shepherd)
+  #:use-module (gnu services web)
+  #:use-module (gnu services networking)
   #:use-module (gnu services)
-  #:use-module (srfi srfi-1)
+  #:use-module (guix records)
   #:use-module (ice-9 textual-ports)
-  #:export (append-service-extensions))
+  #:export (onion-service-domains))
 
-(define (append-service-extensions type lst)
-   "Return TYPE, a service type, involve the service extensions
-targeting one of the types in LST."
-   (service-type
-     (inherit type)
-     (extensions (append lst
-                         (service-type-extensions type)))))
+(define (onion-service-domains service)
+  "Return String, the onion service domains."
+  (let ((onion-hostname-file
+         (string-append "/var/lib/tor/hidden-services/" service "/hostname")))
+    (if (file-exists? onion-hostname-file)
+        (call-with-input-file onion-hostname-file get-line))))
