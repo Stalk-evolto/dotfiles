@@ -40,8 +40,8 @@
   (list "aspell"
         "aspell-dict-en"
         "emacs"
+	"emacs-eclip"
         "emacs-debbugs"
-        "emacs-monokai-theme"
         "git"
         "ripgrep"
         ))
@@ -53,9 +53,6 @@
         "guile"
         "guile-readline"
         "guile-colorized"))
-
-(define %emacs-for-c
-  (list "gcc-toolchain"))
 
 (home-environment
  ;; Below is the list of packages that will show up in your
@@ -72,8 +69,7 @@
      "rust"
      "docker-cli")
     %emacs-base-packages
-    %emacs-for-guix
-    %emacs-for-c)))
+    %emacs-for-guix)))
 
  ;; Below is the list of Home services.  To search for available
  ;; services, run 'guix home search KEYWORD' in a terminal.

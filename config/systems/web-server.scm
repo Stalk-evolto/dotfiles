@@ -17,7 +17,6 @@
   #:use-module (config services shepherd)
   #:use-module (config services)
   #:use-module (config systems minimal)
-  #:use-module (config services hidden-web)
   #:use-module (gnu services cgit)
   #:use-module (gnu services networking)
   #:use-module (gnu services version-control)
@@ -43,7 +42,6 @@
                     (list
                      (nginx-server-configuration
                        (listen '("unix:/var/run/tor/website.sock"))
-                       (server-name (list (onion-service-domains "website")))
                        ;; (ssl-certificate
                        ;;  "/etc/certs/git/fullchain.pem")
                        ;; (ssl-certificate-key
@@ -52,9 +50,7 @@
                         (list
                          (git-http-nginx-location-configuration
                           (git-http-configuration
-                            (uri-path "/")
-                            (fcgiwrap-socket "unix:/var/run/fcgiwrap/website.sock")
-                            ))))))))))
+                            (uri-path "/")))))))))))
                 (description "This is Git http server onion service.")
                 (default-value '())))
 
@@ -70,9 +66,7 @@
 
         (service git-http-service-type)
 
-        (service fcgiwrap-service-type
-                 (fcgiwrap-configuration
-                   (socket "unix:/var/run/fcgiwrap/website.sock")))
+        (service fcgiwrap-service-type)
 
         (service nginx-service-type
                  (nginx-configuration
