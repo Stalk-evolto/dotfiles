@@ -76,7 +76,6 @@
                        (provision '(update-git-mirror))
                        (requirement '(user-processes networking git-daemon))
                        (modules '((shepherd service timer)
-                                  (gnu packages guile)
                                   (git)))
                        (start
                         (with-extensions (list guile-git

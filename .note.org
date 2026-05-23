@@ -1,0 +1,371 @@
+* Scheme Procedure: call/cc proc
+
+call/cc 是 call-with-current-continuation 的缩写函数
+
+** 原理
+
+有这样一个 procedure
+#+begin_src scheme :resultes output verbtim replace
+  (define (foo)
+    (display "hello\n")
+    (display (bar)) (newline)
+    (exit))
+#+end_src
+
+当定义 bar 时， foo 能正常使用
+#+begin_src scheme
+  (define (bar) "hi")
+  (foo)
+#+end_src
+
+#+begin_example
+=> hello
+   hi
+#+end_example
+
+从 bar 所在行开始到函数结束，就像是被包装成了一个新的 procedure
+#+begin_src scheme
+  (lambda (r)
+    (display r) (newline)
+    (exit))
+#+end_src
+
+call/cc 会捕获这样一个 procedure 作为输入传递到 proc ，之后我将用 continuation 称呼它
+
+#+begin_src scheme
+  (define (foo)
+    (display "hello\n")
+    (display (call/cc (lambda (k) (k bar)))) (newline)
+    (exit))
+#+end_src
+
+同理，当定义 bar 时， foo 能正常使用
+#+begin_src scheme
+  (define (bar) "hi")
+  (foo)
+#+end_src
+
+#+begin_example
+=> hello
+   hi
+#+end_example
+
+** 过程拆解
+
+procedure foo 在 eval 时
+
+1. eval display
+   #+begin_src scheme
+     (display "hello\n.")
+   #+end_src
+
+2. 遇到了 call/cc ，将后续计算打包成以下 procedure (foo 的 continuation)，作为 call/cc 的 proc 的输入
+   #+begin_src scheme
+     (lambda (r)
+       (display r) (newline)
+       (exit))
+   #+end_src
+
+   等价于
+   #+begin_src scheme
+     (define (foo)
+       (display "hello\n")
+       ((lambda (k) (k bar)) (lambda (r) (display r) (newline)
+                                    (exit))))
+   #+end_src
+
+   同理，当定义 bar 时， foo 能正常使用
+   #+begin_src scheme
+     (define (bar) "hi")
+     (foo)
+   #+end_src
+
+   #+begin_example
+   => hello
+      hi
+   #+end_example
+
+** 性质
+
+   1. 没有调用 k (continuation) 时， lambda 按顺序 eval ， 返回值传递给 continuation
+      #+begin_src scheme
+        (call/cc
+         (lambda (k)
+           (* 5 4)))
+      #+end_src
+
+      #+begin_example
+      => 20
+      #+end_example
+
+      等价于
+      #+begin_src scheme
+        ((lambda (k)
+           (* 5 4))
+         (lambda (r) r))
+      #+end_src
+
+   2. 调用 k (continuation) 时， k 的返回值作为整个 procedure 的返回值返回，就像继续执行到了 procedure 末尾
+      #+begin_src scheme
+        (call/cc
+         (lambda (k)
+           (* 5 (k 4))))
+      #+end_src
+
+      #+begin_example
+      => 4
+      #+end_example
+
+
+   3. 外部有计算，将后续计算打包成 lambda 作为 proc 的输入 (continuation)
+      #+begin_src scheme
+        (+ 2
+           (call/cc
+            (lambda (k)
+              (* 5 (k 4)))))
+      #+end_src
+
+      #+begin_example
+      => 6
+      #+end_example
+
+等价对比
+1.
+#+begin_src scheme
+  (call/cc
+   (lambda (k)
+     (* 5 4)))
+#+end_src
+等价于
+#+begin_src scheme
+  ((lambda (k)
+     (* 5 4))
+   (lambda (r) r))
+#+end_src
+2.
+#+begin_src scheme
+  (call/cc
+   (lambda (k)
+     (* 5 (k 4))))
+#+end_src
+等价于
+#+begin_src scheme
+    ((lambda (k)
+       (k 4))
+     (lambda (r) r))
+#+end_src
+3.
+#+begin_src scheme
+  (+ 2
+     (call/cc
+      (lambda (k)
+        (* 5 (k 4)))))
+#+end_src
+等价于
+#+begin_src scheme
+  ((lambda (k)
+     (k 4))
+   (lambda (r) (+ 2 r)))
+#+end_src
+
+** 案例
+
+#+begin_src scheme
+  (define retry #f)
+
+  (define factorial
+    (lambda (x)
+      (if (= x 0)
+          (call/cc (lambda (k) (set! retry k) 1))
+          (* x (factorial (- x 1))))))
+#+end_src
+
+#+begin_src scheme
+(factorial 4)
+#+end_src
+
+#+begin_example
+=> 24
+#+end_example
+
+#+begin_src
+(retry 2)
+#+end_src
+
+#+begin_example
+=> 48
+#+end_example
+
+#+begin_src
+(retry 0)
+#+end_src
+
+#+begin_example
+=> 0
+#+end_example
+
+1. 声明了 retry 防止在定义 factorial 时 warning: possibly unbound variable `retry'
+   #+begin_src scheme
+     (define retry #f)
+   #+end_src
+
+2. 定义 factorial ，其中把 procedure 的 continuation 使用 set! 赋值给 retry
+   #+begin_src scheme
+     (define factorial
+       (lambda (x)
+         (if (= x 0)
+             (call/cc (lambda (k) (set! retry k) 1))
+             (* x (factorial (- x 1))))))
+   #+end_src
+
+   现在 retry 即是 factorial 的 continuation ， continuation 为
+   #+begin_src scheme
+     (lambda (r)
+       (if (= x 0)
+           r
+           (* x (factorial (- x 1)))))
+   #+end_src
+
+3. 调用 factorial ，此时 call/cc 部分没有调用 k (continuation)，这部分返回值为 1，传递给 continuation
+   #+begin_src scheme
+     (factorial 4)
+   #+end_src
+
+   等价于
+   #+begin_src scheme
+     (* 4 (* 3 (* 2 (* 1 1))))
+   #+end_src
+
+   #+begin_example
+   => 24
+   #+end_example
+
+   此时调用 retry 修改 continuation 的输入
+   #+begin_example
+   (retry 2)
+   #+end_example
+
+   等价于
+   #+begin_src scheme
+     (* 4 (* 3 (* 2 (* 1 2))))
+   #+end_src
+
+   #+begin_example
+   => 48
+   #+end_example
+
+   当然也可以给 retry 赋值 0
+   #+begin_src scheme
+     (retry 0)
+   #+end_src
+
+   等价于
+   #+begin_src scheme
+     (* 4 (* 3 (* 2 (* 1 0))))
+   #+end_src
+
+   #+begin_example
+   => 0
+   #+end_example
+
+** 一个稍微复杂一点的例子
+
+有如下的 define
+
+#+begin_src scheme
+  (define lwp-list '())
+  (define lwp
+    (lambda (thunk)
+      (set! lwp-list (append lwp-list (list thunk)))))
+
+  (define start
+    (lambda ()
+      (let ([p (car lwp-list)])
+        (set! lwp-list (cdr lwp-list))
+        (p))))
+
+  (define pause
+    (lambda ()
+      (call/cc
+       (lambda (k)
+         (lwp (lambda () (k #f)))
+         (start)))))
+#+end_src
+
+- lwp-list 用于储存 thunk (没有输入的 procdure) 的 list
+- lwp 将 thunk 追加到 lwp-list 中
+- start 从 lwp-list 中取出 thunk 并 eval 取出的 thunk
+- pause 暂停，使用 lwp 给 lwp-list 追加新值后继续
+
+调用示例
+
+#+begin_src scheme
+  (lwp (lambda () (let f () (pause) (display "h") (f))))
+  (lwp (lambda () (let f () (pause) (display "e") (f))))
+  (lwp (lambda () (let f () (pause) (display "y") (f))))
+  (lwp (lambda () (let f () (pause) (display "!") (f))))
+  (lwp (lambda () (let f () (pause) (newline) (f))))
+  (start)
+#+end_src
+
+#+begin_example
+=> hey!
+   hey!
+   hey!
+   hey!
+   .
+   .
+   .
+#+end_example
+
+往复 display hey!
+
+演示结束，开始拆解
+
+先从赋值开始
+#+begin_src scheme
+    (lwp (lambda () (let f () (pause) (display "h") (f))))
+#+end_src
+
+这条表达式用 lwp 将 (lambda () (let f () (pause) (display "h") (f))) 这个 thunk 追加进 lwp-list
+lambda 定义了一个 precedure 由于没有 argument 输入，被称为 thunk
+let 定义了一个局部的没有 argument 输入的 precedure，在最后重新 eval 了自己，被称为递归 (Recursion),由于没有终止条件，这个做法会一直重复 eval 自己
+pause 将 display 追加进 lwp，拆解其过程
+
+#+begin_src scheme
+  (define pause
+    (lambda ()
+      (call/cc
+       (lambda (k)
+         (lwp (lambda () (k #f)))
+         (start)))))
+#+end_src
+
+想当然的等价于
+#+begin_src scheme
+  (define pause
+    (lambda ()
+      ((lambda (k)
+         (lwp (lambda () (k #f)))
+         (start))
+       (lambda (r) r))))
+#+end_src
+
+结果很意外，并没有像使用 call/cc 那样输出。为什么呢？因为 call/cc 传递的 continuation 是 pause 的后续计算，这样模拟的只是一个达到相同计算效果的 procedure 。
+正确的拆解应该是
+1. 将 pause 的 continuation 使用 call/cc 捕获，continuation 被放在一个 thunk 里，使用 lwp 将其追加到 lwp-list 后面，当这个 thunk 被 eval 时，会跳会 pause 返回值， 也就是会回到当前 thunk 继续执行。
+   #+begin_src scheme
+     ;; lwp-list
+     '((lambda () (let f () (pause) (display "h") (f))) ; item h
+       (lambda () (let f () (pause) (display "e") (f))) ; item e
+       (lambda () (let f () (pause) (display "y") (f))) ; item y
+       (lambda () (let f () (pause) (display "!") (f))) ; item !
+       (lambda () (let f () (pause) (newline) (f)))    ; item newline
+       ;; continuation-char is the item char thunk's continuation, its name not true is continuation-char.
+       (lambda () (continuation-h #f))       ; goto item h pause
+       (lambda () (continuation-e #f))       ; goto item e pause
+       (lambda () (continuation-y #f))       ; goto item y pause
+       (lambda () (continuation-! #f))       ; goto item ! pause
+       (lambda () (continuation-newline #f))) ; goto item newline pause
+     #+end_src
+2. eval start 进入下一个 thunk，直到 eval 到其他 thunk 的 continuation 跳回对应的 thunk 继续执行.

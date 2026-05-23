@@ -24,9 +24,11 @@
   #:use-module (ice-9 textual-ports)
   #:export (onion-service-domains))
 
-(define (onion-service-domains service)
+(define (onion-service-domains)
   "Return String, the onion service domains."
-  (let ((onion-hostname-file
-         (string-append "/var/lib/tor/hidden-services/" service "/hostname")))
-    (if (file-exists? onion-hostname-file)
-        (call-with-input-file onion-hostname-file get-line))))
+  (call/cc
+   (lambda (service)
+    (let ((onion-hostname-file
+           (string-append "/var/lib/tor/hidden-services/" service "/hostname")))
+      (if (file-exists? onion-hostname-file)
+          (call-with-input-file onion-hostname-file get-line))))))
