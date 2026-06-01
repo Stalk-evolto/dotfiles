@@ -14,21 +14,128 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-(define-module (config services hiddent-web)
+(define-module (config services hidden-web)
   #:use-module (config services)
+  #:use-module (fibers channels)
+  #:use-module (fibers)
+  #:use-module (gnu services networking)
   #:use-module (gnu services shepherd)
   #:use-module (gnu services web)
-  #:use-module (gnu services networking)
   #:use-module (gnu services)
+  #:use-module (gnu system)
+  #:use-module (guix gexp)
   #:use-module (guix records)
   #:use-module (ice-9 textual-ports)
-  #:export (onion-service-domains))
+  #:use-module (srfi srfi-1)
+  #:export (onion-service-domain
+            spawn-onion-service-domain
+            onion-server-record))
 
-(define (onion-service-domains)
+(define-record-type* <onion-nginx-server-configuration> onion-nginx-server-configuration
+  make-onion-nginx-server-configuration
+  onion-nginx-server-configuration?
+  (hidden-services onion-nginx-server-configuration-hidden-services
+                   (default '()))       ;list of <tor-onion-service-configuration>
+  (server-blocks onion-nginx-server-configuration-server-blocks
+                 (default '()))          ;list of <nginx-server-configuration>
+  )
+
+(define (onion-service-domain channel service)
   "Return String, the onion service domains."
-  (call/cc
-   (lambda (service)
-    (let ((onion-hostname-file
-           (string-append "/var/lib/tor/hidden-services/" service "/hostname")))
-      (if (file-exists? onion-hostname-file)
-          (call-with-input-file onion-hostname-file get-line))))))
+  (let loop ((onion-hostname-file
+              (string-append "/var/lib/tor/hidden-services/" service "/hostname")))
+    (if (file-exists? onion-hostname-file)
+        (put-message channel
+                     (call-with-input-file onion-hostname-file get-line))
+        (loop onion-hostname-file))))
+
+(define (spawn-onion-service-domain service)
+  (let ((channel (make-channel)))
+    (spawn-fiber
+     (lambda ()
+       (onion-service-domain channel service)))
+    channel))
+
+(define (set-nginx-server-configuration-server-name config var)
+  "Return a copy of NGINX-SERVER-CONFIGURATION where SERVER-NAME has the SERVER-NAMES.
+SERVER-NAMES must be a string in list."
+  (nginx-server-configuration
+   (inherit config)
+   (server-name var)))
+
+(define (set-nginx-server-configuration-listen config var)
+  "Return a copy of NGINX-SERVER-CONFIGURATION where LISTEN has the LISTENS.
+LISTENS must be a string in list."
+  (nginx-server-configuration
+   (inherit config)
+   (listen var)))
+
+(define (operating-system-nginx-server-blocks-merge os var)
+  (operating-system
+    (inherit os)
+    (services
+     (modify-services (operating-system-user-services os)
+       (nginx-service-type
+        config => (nginx-configuration
+                    (inherit config)
+                    (server-blocks (append
+                                    (nginx-configuration-server-blocks config)
+                                    var))))))))
+
+(define (wrapper-nginx-server-blocks config)
+  (let* ((hidden-services (onion-nginx-server-configuration-hidden-services config))
+         (service-names (map tor-onion-service-configuration-name hidden-services))
+         (listens (delete-duplicates
+                   (map (lambda (mapping) (cdr mapping))
+                        (map tor-onion-service-configuration-mapping hidden-services))))
+         (server-blocks (onion-nginx-server-configuration-server-blocks config)))
+    (run-fibers
+     (lambda ()
+       (map
+        (lambda (server-block listen service-name)
+          (set-nginx-server-configuration-server-name
+           (set-nginx-server-configuration-listen server-block listen)
+           (get-message (spawn-onion-service-domain service-name))))
+        server-blocks listens service-names)))))
+
+(define (onion-nginx-extension-merge a b)
+  (onion-nginx-server-configuration
+   (hidden-services
+    (append
+     (onion-nginx-server-configuration-hidden-services a)
+     (onion-nginx-server-configuration-hidden-services b)))
+   (server-blocks
+    (append
+     (onion-nginx-server-configuration-server-blocks a)
+     (onion-nginx-server-configuration-hidden-services b)))))
+
+(define onion-nginx-service-type
+  (service-type (name 'onion-nginx)
+                (extensions
+                 (list
+                  (service-extension
+                   nginx-service-type
+                   (const (lambda (config)
+                            (onion-nginx-server-configuration-server-blocks config))))
+                  (service-extension
+                   tor-service-type
+                   (const (lambda (config)
+                            (onion-nginx-server-configuration-hidden-services config))))))
+                (compose (lambda (args)
+                           (fold onion-nginx-extension-merge
+                                 (onion-nginx-server-configuration)
+                                 args)))
+                (extend
+                 (lambda (config extension)
+                   (onion-nginx-server-configuration
+                    (inherit config)
+                    (hidden-services
+                     (append
+                      (onion-nginx-server-configuration-hidden-services config)
+                      (onion-nginx-server-configuration-hidden-services extension)))
+                    (server-blocks
+                     (append
+                      (onion-nginx-server-configuration-server-blocks config)
+                      (onion-nginx-server-configuration-server-blocks extension))))))
+                (default-value (onion-nginx-server-configuration))
+                (description "Run the nginx with tor domain Web server.")))

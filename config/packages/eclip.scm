@@ -35,7 +35,7 @@
 (define-public emacs-eclip
 (package
   (name "emacs-eclip")
-  (version "1.0.1-rc")
+  (version "1.0.2")
   (source
    (origin
      (method git-fetch)
@@ -44,7 +44,7 @@
 	   (commit (string-append "v" version))))
      (file-name (git-file-name name version))
      (sha256
-      (base32 "0d60sr5qsyi4210f6rcjh0fxg5bqsv1yihzdr7rm47p4d0d5a8r8"))))
+      (base32 "13x9r3cgp8irmc49ck369az8sr2gbh5fh358fg5lfqkvw4869n3f"))))
   (native-inputs
    (list emacs))
 

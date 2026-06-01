@@ -14,9 +14,12 @@
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 (define-module (config systems web-server)
+
   #:use-module (config services shepherd)
   #:use-module (config services)
   #:use-module (config systems minimal)
+  #:use-module (fibers channels)
+  #:use-module (fibers)
   #:use-module (gnu services cgit)
   #:use-module (gnu services networking)
   #:use-module (gnu services version-control)
@@ -42,6 +45,7 @@
                     (list
                      (nginx-server-configuration
                        (listen '("unix:/var/run/tor/website.sock"))
+
                        ;; (ssl-certificate
                        ;;  "/etc/certs/git/fullchain.pem")
                        ;; (ssl-certificate-key

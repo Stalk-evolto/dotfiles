@@ -130,41 +130,21 @@
                           (type "vfat"))
                         %base-file-systems))))
 
-(define %system-log-message-destination
-  ;; Shepherd system log message destination procedure.  Log most messages to
-  ;; the console, which goes to the serial output, allowing the host to log
-  ;; it.
-  #~(lambda (message)
-      (cond ((= (system-log-priority debug)
-                (system-log-message-priority message))
-             '("/var/log/debug"))
-            ((member (system-log-message-facility message)
-                     (list (system-log-facility authorization)
-                           (system-log-facility authorization/private)))
-             '("/var/log/secure"))
-            (else
-             '("/dev/console")))))
-
-(define gc-service-type                           ;TODO: Factorize.
-  (shepherd-service-type
-   'garbage-collection
-   (lambda _
-     (shepherd-service
-       (provision '(gc))
-       (requirement '(user-processes guix-daemon))
-       (start #~(make-timer-constructor
-                 (calendar-event #:minutes '(12))
-                 (command
-                  '("/run/current-system/profile/bin/guix" "gc" "-F2G"))
-                 #:wait-for-termination? #t))
-       (stop #~(make-timer-constructor))
-       (actions (list shepherd-trigger-action))))
-   #t
-   (description "Periodically collect garbage.")))
+(define %build-vm-operating-system
+  (operating-system
+    (inherit %virtual-build-machine-operating-system)
+    (services
+     (modify-services (operating-system-user-services
+                       %virtual-build-machine-operating-system)
+       (openssh-service-type config =>
+                (openssh-configuration
+                  (openssh openssh-sans-x)
+                  (permit-root-login #t)
+                  (allow-empty-passwords? #t)))))))
 
 (define %build-vm-machine-image
   (let* ((type (lookup-image-type-by-name 'mbr-raw))
-         (base (os->image %virtual-build-machine-operating-system
+         (base (os->image %build-vm-operating-system
                           #:type type)))
     (image (inherit base)
            (format 'compressed-qcow2)

@@ -131,42 +131,42 @@ procedure foo 在 eval 时
 
 等价对比
 1.
-#+begin_src scheme
-  (call/cc
-   (lambda (k)
-     (* 5 4)))
-#+end_src
-等价于
-#+begin_src scheme
-  ((lambda (k)
-     (* 5 4))
-   (lambda (r) r))
-#+end_src
+    #+begin_src scheme
+      (call/cc
+       (lambda (k)
+         (* 5 4)))
+    #+end_src
+    等价于
+    #+begin_src scheme
+      ((lambda (k)
+         (* 5 4))
+       (lambda (r) r))
+    #+end_src
 2.
-#+begin_src scheme
-  (call/cc
-   (lambda (k)
-     (* 5 (k 4))))
-#+end_src
-等价于
-#+begin_src scheme
-    ((lambda (k)
-       (k 4))
-     (lambda (r) r))
-#+end_src
+    #+begin_src scheme
+      (call/cc
+       (lambda (k)
+         (* 5 (k 4))))
+    #+end_src
+    等价于
+    #+begin_src scheme
+        ((lambda (k)
+           (k 4))
+         (lambda (r) r))
+    #+end_src
 3.
-#+begin_src scheme
-  (+ 2
-     (call/cc
-      (lambda (k)
-        (* 5 (k 4)))))
-#+end_src
-等价于
-#+begin_src scheme
-  ((lambda (k)
-     (k 4))
-   (lambda (r) (+ 2 r)))
-#+end_src
+    #+begin_src scheme
+      (+ 2
+         (call/cc
+          (lambda (k)
+            (* 5 (k 4)))))
+    #+end_src
+    等价于
+    #+begin_src scheme
+      ((lambda (k)
+         (k 4))
+       (lambda (r) (+ 2 r)))
+    #+end_src
 
 ** 案例
 
@@ -369,3 +369,103 @@ pause 将 display 追加进 lwp，拆解其过程
        (lambda () (continuation-newline #f))) ; goto item newline pause
      #+end_src
 2. eval start 进入下一个 thunk，直到 eval 到其他 thunk 的 continuation 跳回对应的 thunk 继续执行.
+
+* Fibers
+
+* record
+
+** record-modifier rtd field-name
+
+- rtd (record-type-define) record 类型定义
+- field-name record 的 field 名称
+返回一个接受两个参数的 procedure 用于更改 rtd 的 field-name 的 field 的 value
+- record 需要修改的 record 的 symbol
+- value 修改的目标值
+
+#+begin_src scheme
+  (use-modules (guix gexp))
+
+  (define-record-type* <thing> thing make-thing
+    thing?
+    this-thing
+    (name  thing-name (default "chbouib"))
+    (port  thing-port
+           (default 22) (thunked)))
+
+  (define thingr (thing
+                 (name "foo")
+                 (port 33)))
+#+end_src
+
+#+begin_example
+(thing-name thingr)
+=> "foo"
+#+end_example
+
+#+begin_src scheme
+  ((record-modifier <thing> 'name) thingr "thingr")
+#+end_src
+
+#+begin_example
+=> "thingr"
+(thing-name thingr)
+=> "thingr"
+#+end_example
+
+Fibers 是 Guile 的异步模块，可以控制多个 Fibers 之间的顺序与交互。
+
+* monads
+
+在函数式编程范式中代表：把某个 monadic 里的东西拿出来执行一个 procedure 得到装在 monadic 里的结果
+在这是 guix 为了简化 store 操作而使用的框架，将 %store-monad 中的东西拿出来执行一个 procedure 得到 %store-monad 里的结果
+
+** with-monad monad body …
+使 body 中可以使用 return 和 >>=
+
+*** return
+返回一个封装在 monadic 里的 value (记作 mval)
+
+*** >>= mval mproc …
+mval 作为输入依次执行 mproc (monadic procedures)
+
+** mlet monad ((var mval) …) body …
+** mlet* monad ((var mval) …) body …
+
+类似 let 与 let* ，在 monad 中使用的局部变量绑定， body 的结果在 monadic 中。
+
+** mbegin monad mexp …
+
+类似 begin 按顺序执行 mexp ，结果在 monadic 中。
+
+*** mwhen condition mexp0 mexp* …
+*** munless condition mexp0 mexp* …
+
+在 mbegin 里使用的 when 和 unless
+
+* Guix service
+
+** <live-service>
+储存 live 状态的 service 的 record
+
+** running-services eval
+- eval 一个 G-Expression 用于 evalution current-services
+
+反回 <live-service>
+
+** upgrade-services-program service-files to-start to-unload to-restart
+- service-file service file 列表，可以用 shepherd-service-file 生成，最终被 load-service 添加到 register-services 中，让 shepherd 能够管理
+- to-start 没有启动的 auto-start? 为 #t 的 service canonical name 列表
+- to-unload 需要 to-unload 的 service 列表，可以用 shepherd-service-upgrade 生成
+- to-restart 需要 to-restart 的 service 列表，可以用 shepherd-service-upgrade 生成
+
+*** shepherd-service-file
+*** shepherd-service-upgrade live target
+通过 live 和 target 的对比，得到需要 to-restart 和 to-unload 的 services list
+
+返回在 store 中 的 upgrade-shepherd-services.scm ，运行后更新 PID 1 (shepherd)
+
+** upgrade-shepherd-services eval os
+使用 eval 更新 os 的 shepherd services
+
+** fold-services services [#:target-type system-service-type]
+返回 services extend 后的结果，返回多个值 service 和 vhash

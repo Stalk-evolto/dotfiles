@@ -157,6 +157,10 @@ Bridge webtunnel [2001:db8:fbfa:48b4:5520:53e6:24b4:eca0]:443 93807A85521915D7D2
    ;; The list of file systems that get "mounted".  The unique
    ;; file system identifiers there ("UUIDs") can be obtained
    ;; by running 'blkid' in a terminal.
-   (file-systems %base-file-systems)))
+   (file-systems (cons (file-system              ;unused
+                          (mount-point "/")
+                          (device "none")
+                          (type "tmpfs"))
+                        %base-file-systems))))
 
 %minimal-system
