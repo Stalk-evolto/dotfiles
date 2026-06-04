@@ -147,46 +147,46 @@
      ;;           (cache "/var/cache/guix/publish")
      ;;           (ttl 432000)))
 
-     ;; (service update-git-mirror-service-type)
+     (service update-git-mirror-service-type)
      (service git-ssh-service-type
               `(("git" ,(local-file "/home/stalk/keys/qin_rixiang.pub")
                  ,(local-file "/home/stalk/keys/stalk-win.pub"))))
 
-    (service pounce-service-type
-             (pounce-configuration
-              (shepherd-requirement '(user-processes networking))
-              (host "irc.libera.chat")
-              (client-cert "/etc/pounce/libera.pem")
-              (sasl-external? #t)
-              (nick "stalk")
-              (join (list "#gnu" "#guix" "#guile" "#hurd" "#fossjobs"))))
+     (service pounce-service-type
+              (pounce-configuration
+               (shepherd-requirement '(user-processes networking))
+               (host "irc.libera.chat")
+               (client-cert "/etc/pounce/libera.pem")
+               (sasl-external? #t)
+               (nick "stalk")
+               (join (list "#gnu" "#guix" "#guile" "#hurd" "#fossjobs"))))
 
-    (service spice-vdagent-service-type)
-    (service containerd-service-type)
-    (service mysql-service-type
-             (mysql-configuration
-              (bind-address "127.0.0.1")
-              (extra-content
-               `(string-append "basedir=" ,mariadb))
-              (extra-environment #~'("HOSTNAME='stalk-evolto'"))
-              (auto-upgrade? #f)))
-    (service redis-service-type)
-    (service nftables-service-type
-             (nftables-configuration
+     (service spice-vdagent-service-type)
+     (service containerd-service-type)
+     (service mysql-service-type
+              (mysql-configuration
+               (bind-address "127.0.0.1")
+               (extra-content
+                `(string-append "basedir=" ,mariadb))
+               (extra-environment #~'("HOSTNAME='stalk-evolto'"))
+               (auto-upgrade? #f)))
+     (service redis-service-type)
+     (service nftables-service-type
+              (nftables-configuration
                (ruleset (local-file "aux-files/nftables.conf"))))
 
-    (service darkstat-service-type
-             (darkstat-configuration
-              (interface "wlo1")))
+     (service darkstat-service-type
+              (darkstat-configuration
+               (interface "wlo1")))
 
-    (service i2pd-service-type
-             (i2pd-configuration
-              (config-file (plain-file "i2pd.conf" "\
+     (service i2pd-service-type
+              (i2pd-configuration
+               (config-file (plain-file "i2pd.conf" "\
 ipv6 = true
 [reseed]
 proxy = http://localhost:8118
 "))
-              (tunnels-config-file (plain-file "tunnels.conf" "\
+               (tunnels-config-file (plain-file "tunnels.conf" "\
 [alt-socks]
 type = socks
 address = 127.0.0.1
@@ -223,35 +223,35 @@ port = 8441
 destination = vp3vans4ra3vpo24orm5seaxvod4x4lwiqajrfazb62hfwb45ddq.b32.i2p
 keys = transient-tg-mtproxy"))))
 
-    (service tor-service-type
-             (tor-configuration
-              (tor tor-latest)
-              (socks-socket-type 'tcp)
-              (config-file (local-file
-                            "/etc/tor/torrc"))
-              (hidden-services
-               (list (tor-onion-service-configuration
-                      (name "monero-service")
-                      (mapping '((18084 "127.0.0.1:18084")
-                                 (18089 "127.0.0.1:18089"))))
-		     (tor-onion-service-configuration
-		      (name "blog")
-		      (mapping '((8080 "127.0.0.1:8080"))))))
-              (transport-plugins
-               (list (tor-transport-plugin
-                      (protocol "webtunnel")
-                      (program (file-append webtunnel "/bin/client")))
-                     (tor-transport-plugin
-                      (protocol "obfs4")
-                      (program (file-append lyrebird "/bin/lyrebird")))))))
+     (service tor-service-type
+              (tor-configuration
+               (tor tor-latest)
+               (socks-socket-type 'tcp)
+               (config-file (local-file
+                             "/etc/tor/torrc"))
+               (hidden-services
+                (list (tor-onion-service-configuration
+                       (name "monero-service")
+                       (mapping '((18084 "127.0.0.1:18084")
+                                  (18089 "127.0.0.1:18089"))))
+		      (tor-onion-service-configuration
+		       (name "blog")
+		       (mapping '((8080 "127.0.0.1:8080"))))))
+               (transport-plugins
+                (list (tor-transport-plugin
+                       (protocol "webtunnel")
+                       (program (file-append webtunnel "/bin/client")))
+                      (tor-transport-plugin
+                       (protocol "obfs4")
+                       (program (file-append lyrebird "/bin/lyrebird")))))))
 
-    (service samba-service-type
-             (samba-configuration
-              (enable-samba? #f)
-              (enable-smbd? #t)
-              (enable-nmbd? #t)
-              (enable-winbindd? #f)
-              (config-file (plain-file "smb.conf" "\
+     (service samba-service-type
+              (samba-configuration
+               (enable-samba? #f)
+               (enable-smbd? #t)
+               (enable-nmbd? #t)
+               (enable-winbindd? #f)
+               (config-file (plain-file "smb.conf" "\
 [global]
 map to guest = Bad User
 logging = syslog@1
@@ -263,38 +263,38 @@ read only = no
 guest ok = yes
 guest only = yes\n"))))
 
-    (service libvirt-service-type
-             (libvirt-configuration
-	      (unix-sock-group "libvirt")
-              (tls-port "16555")))
-    (service qemu-binfmt-service-type
-             (qemu-binfmt-configuration
-              (platforms
-               (lookup-qemu-platforms "arm" "aarch64"))))
+     (service libvirt-service-type
+              (libvirt-configuration
+	       (unix-sock-group "libvirt")
+               (tls-port "16555")))
+     (service qemu-binfmt-service-type
+              (qemu-binfmt-configuration
+               (platforms
+                (lookup-qemu-platforms "arm" "aarch64"))))
 
-    (service virtlog-service-type
-             (virtlog-configuration
-              (max-clients 1000)
-              (log-outputs "2:file:/var/log/virtlog")))
+     (service virtlog-service-type
+              (virtlog-configuration
+               (max-clients 1000)
+               (log-outputs "2:file:/var/log/virtlog")))
 
-    (service virtual-build-machine-service-type
-             (virtual-build-machine
-              (image %build-vm-machine-image)
-              (cpu "max")
-              (cpu-count 1)
-              (memory-size 2048)
-              (systems (list "x86_64-linux"))
-              (port-forwardings `((21004 . 1004)
-                                  (21022 . 22)))
-              (auto-start? #f)))
-    (service hurd-vm-service-type
-             (hurd-vm-configuration (os %childhurd-os)
-                                    (disk-size (* 5000
-                                                  (expt 2 20)))
-                                    (memory-size 1024)))
+     (service virtual-build-machine-service-type
+              (virtual-build-machine
+               (image %build-vm-machine-image)
+               (cpu "max")
+               (cpu-count 1)
+               (memory-size 2048)
+               (systems (list "x86_64-linux"))
+               (port-forwardings `((21004 . 1004)
+                                   (21022 . 22)))
+               (auto-start? #f)))
+     (service hurd-vm-service-type
+              (hurd-vm-configuration (os %childhurd-os)
+                                     (disk-size (* 5000
+                                                   (expt 2 20)))
+                                     (memory-size 1024)))
 
-    (set-xorg-configuration
-     (xorg-configuration (keyboard-layout keyboard-layout))))
+     (set-xorg-configuration
+      (xorg-configuration (keyboard-layout keyboard-layout))))
 
     %web-server-services
 

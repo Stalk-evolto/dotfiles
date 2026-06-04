@@ -371,6 +371,26 @@ pause 将 display 追加进 lwp，拆解其过程
 2. eval start 进入下一个 thunk，直到 eval 到其他 thunk 的 continuation 跳回对应的 thunk 继续执行.
 
 * Fibers
+guile 并发编程的一种方式， Fiber 是 Fibers 的最小单元， 可以通过 spawn-fiber 创建分支 Fibers ，最终通过 run-fibers 统一启动。
+
+#+begin_src dot :file tree.png :cmdline -Tpng
+  digraph {
+  node [shap=box]
+  "run-fibers" -> "spawn-fiber 1"
+  "run-fibers" -> "spawn-fiber 2"
+  "run-fibers" -> "spawn-fiber 3"
+  "run-fibers" -> "spawn-fiber ..."
+  }
+#+end_src
+
+#+RESULTS:
+[[file:tree.png]]
+
+** 运行 Fibers
+
+*** run-fibers [init-thunk=#f] [#:install-suspendable-ports?=#t] [#:scheduler=#f] [#:parallelism=(current-processor-count)] [#:cpus=(getaffinity 0)] [#:hz=100] [#:drain?=#f]
+
+*** spawn-fiber thunk [scheduler=(require-current-scheduler)] [#:parallel?=#f]
 
 * record
 
@@ -419,6 +439,111 @@ Fibers 是 Guile 的异步模块，可以控制多个 Fibers 之间的顺序与�
 在函数式编程范式中代表：把某个 monadic 里的东西拿出来执行一个 procedure 得到装在 monadic 里的结果
 在这是 guix 为了简化 store 操作而使用的框架，将 %store-monad 中的东西拿出来执行一个 procedure 得到 %store-monad 里的结果
 
+举个例子
+
+#+begin_src scheme
+  (use-modules (ice-9 match)
+               (srfi srfi-9))
+
+  (define-record-type <maybe>
+    (make-maybe is? value)
+    maybe?
+    (is? maybe-is?)
+    (value maybe-value))
+
+  (define (something value)
+    (make-maybe #t value))
+
+  (define (nothing)
+    (make-maybe #f #f))
+
+  (define (remove-a str)
+    (if (eq? (string-ref str 0) #\a)
+        (something (substring str 1))
+        (nothing)))
+
+  (define (remove-b str)
+    (if (eq? (string-ref str 0) #\b)
+        (something (substring str 1))
+        (nothing)))
+
+  (define (maybe-chain maybe proc)
+    (if (maybe-is? maybe)
+        (proc (maybe-value maybe))
+        (nothing)))
+#+end_src
+
+#+begin_src scheme
+  (define-monad %maybe-monad
+    (bind maybe-chain)
+    (return something))
+
+  (with-monad %maybe-monad
+    (>>= (something "aabbc")
+         remove-a
+         remove-a
+         remove-b
+         remove-b))
+#+end_src
+
+等价于
+
+#+begin_src scheme
+  (define-syntax maybe-chain*
+    (syntax-rules ()
+      ((_ maybe proc)
+       (maybe-chain maybe proc))
+      ((_ maybe proc rest ...)
+       (maybe-chain* (maybe-chain maybe proc)
+                     rest ...))))
+
+  (maybe-chain* (something "abad")
+                remove-a
+                remove-a
+                remove-b
+                remove-b)
+#+end_src
+
+这里的 bind 叫 monad laws ，有以下规则
+
+1. (bind (return x) proc) 等价于 (proc x).
+2. (bind monad return) 等价于 monad. 这里的 monad 是 (return x) 的缩写.
+3. (bind (bind monad proc-1) proc-2) 等价于 (bind monad (lambda (x) (bind (proc-1 x) proc-2))).
+
+看实际例子
+
+#+begin_src scheme
+  (define (mlaws-proc-1 x)
+    (something (+ x 1)))
+
+  (define (mlaws-proc-2 x)
+    (something (+ x 2)))
+
+  ;; First law: the left identity.
+  (equal? (maybe-chain (something 0)
+                       mlaws-proc-1)
+          (mlaws-proc-1 0))
+  ⇒ #t
+
+  ;; Second law: the right identity.
+  (equal? (maybe-chain (something 0)
+                       something)
+          (something 0))
+  ⇒ #t
+
+  ;; Third law: associativity.
+  (equal? (maybe-chain (maybe-chain (something 0)
+                                    mlaws-proc-1)
+                       mlaws-proc-2)
+          (maybe-chain (something 0)
+                       (lambda (x)
+                         (maybe-chain (mlaws-proc-1 x)
+                                      mlaws-proc-2))))
+  ⇒ #t
+#+end_src
+
+可以看出 (bind monad proc) 是把 monad 作为输入传递给 proc ， monad 即 (return x) 的 return 也是 procedure
+
 ** with-monad monad body …
 使 body 中可以使用 return 和 >>=
 
@@ -432,6 +557,26 @@ mval 作为输入依次执行 mproc (monadic procedures)
 ** mlet* monad ((var mval) …) body …
 
 类似 let 与 let* ，在 monad 中使用的局部变量绑定， body 的结果在 monadic 中。
+
+#+begin_src scheme
+  (mlet* %maybe-monad ((str -> "abad") ;non-monadic binding uses the -> symbol
+                     (str1 (remove-a str))
+                     (str2 (remove-b str1)))
+  (remove-a str2))
+#+end_src
+
+等价于
+
+#+begin_src scheme
+  (with-monad %maybe-monad
+  (>>= (return "abad")
+       (lambda (str)
+         (remove-a str))
+       (lambda (str1)
+         (remove-b str1))
+       (lambda (str2)
+         (remove-a str2))))
+#+end_src
 
 ** mbegin monad mexp …
 
@@ -469,3 +614,976 @@ mval 作为输入依次执行 mproc (monadic procedures)
 
 ** fold-services services [#:target-type system-service-type]
 返回 services extend 后的结果，返回多个值 service 和 vhash
+
+* derivations
+derivations 是 package define 的推导，用与控制 build 的可复现构建
+
+** store items
+使用 guix build 构建 glib 时
+
+#+begin_src shell
+  guix build glib
+#+end_src
+
+#+RESULTS:
+| /gnu/store/nbd6d5csab3khdqxiw7r13kqajcwpd4r-glib-2.83.3-bin    |
+| /gnu/store/d75qsh6w41s5y0rfn97z3pm8nq5f27hx-glib-2.83.3-debug  |
+| /gnu/store/03kagz2jlhfmnm9rhh9wrlg66xlhqprj-glib-2.83.3-doc    |
+| /gnu/store/xasxmfxl2kps1xxllbcm8p6abvcd58cq-glib-2.83.3        |
+| /gnu/store/rd67bzia7i1s1rs18bmw2cw2gr66dbxv-glib-2.83.3-static |
+
+可以看到 glib 产生了五个输出，可以使用 guix install glib:bin 安装其中的 bin 输出
+
+那么 guix 是怎么从 package define 构建这些输出的呢?
+
+** .drv 文件
+
+使用 guix build 的 --derivations 参数可以构建 .drv
+
+#+begin_src shell
+  guix build --derivations glib
+#+end_src
+
+#+RESULTS:
+: /gnu/store/vidpgnxk6shgcwbzzawapwknjvwir9s7-glib-2.83.3.drv
+
+还可以使用 .drv 文件代替 package define
+
+#+begin_src shell
+  guix build /gnu/store/vidpgnxk6shgcwbzzawapwknjvwir9s7-glib-2.83.3.drv
+#+end_src
+
+#+RESULTS:
+| /gnu/store/nbd6d5csab3khdqxiw7r13kqajcwpd4r-glib-2.83.3-bin    |
+| /gnu/store/d75qsh6w41s5y0rfn97z3pm8nq5f27hx-glib-2.83.3-debug  |
+| /gnu/store/03kagz2jlhfmnm9rhh9wrlg66xlhqprj-glib-2.83.3-doc    |
+| /gnu/store/xasxmfxl2kps1xxllbcm8p6abvcd58cq-glib-2.83.3        |
+| /gnu/store/rd67bzia7i1s1rs18bmw2cw2gr66dbxv-glib-2.83.3-static |
+
+现在我们看一下 .drv 文件里有什么
+
+#+begin_example
+Derive([("bin","/gnu/store/nbd6d5csab3khdqxiw7r13kqajcwpd4r-glib-2.83.3-bin","",""),("debug","/gnu/store/d75qsh6w41s5y0rfn97z3pm8nq5f27hx-glib-2.83.3-debug","",""),("doc","/gnu/store/03kagz2jlhfmnm9rhh9wrlg66xlhqprj-glib-2.83.3-doc","",""),("out","/gnu/store/xasxmfxl2kps1xxllbcm8p6abvcd58cq-glib-2.83.3","",""),("static","/gnu/store/rd67bzia7i1s1rs18bmw2cw2gr66dbxv-glib-2.83.3-static","","")],[("/gnu/store/13mfnsf82hbc8x6skdx6jywzvgm6zdp3-patch-2.7.6.drv",["out"]),("/gnu/store/2vjnv7mvr1s7ssxq85x3vcvi30v2xayb-python-pyparsing-3.2.3.drv",["out"]),("/gnu/store/30n7ps4aw7kj2cywv9clqilaqmrhr0rx-ninja-1.13.2.drv",["out"]),("/gnu/store/482qbdf67z1m15q0rg8zswi9yfr3vqpa-coreutils-9.1.drv",["out"]),("/gnu/store/4gr3sfaakkmhhcsvzbipc7d5l4w52hdv-zstd-1.5.6.drv",["out"]),("/gnu/store/518dcgk4sgy8573xfrivnqpkwg85bjgg-m4-1.4.19.drv",["out"]),("/gnu/store/55frf22sjqn5jfrg46za8vbc9fpckyqk-make-4.4.1.drv",["out"]),("/gnu/store/60a297ppwa6z4yndl36gx6rvq8ncx13n-file-5.46.drv",["out"]),("/gnu/store/72in2fpp6ixcvlg2r38n4fix5dgbfnxv-zlib-1.3.1.drv",["out"]),("/gnu/store/73i639pm0p29d0218nz92m4c6zfslkh0-xz-5.4.5.drv",["out"]),("/gnu/store/74ylcq016k5z7f3iqqvaijsgjpw0mfzd-python-packaging-25.0.drv",["out"]),("/gnu/store/78gafdwlhm823cyj6c0f6n3zl4r6v9lr-python-docutils-0.21.2.drv",["out"]),("/gnu/store/7nzw07mn4yvp61vcn0kncfy5kf0gjrr4-gzip-1.14.drv",["out"]),("/gnu/store/82lmcralzn78fxkakhrygwfyixr6nz00-pcre2-10.42.drv",["out"]),("/gnu/store/8j321wg9fll4llhn64vghkkhpsl1mdry-tzdata-2025a.drv",["out"]),("/gnu/store/8jzdi0wv2b9ghy0g54ydnq726ca50ldd-glib-2.83.3.drv",["out"]),("/gnu/store/8v12p5m3zn46znl9bmlfssxz1n4fvrvb-util-linux-2.40.4.drv",["lib"]),("/gnu/store/9267ajw5a1jr8bs13vpfxmg8gwnq9a11-meson-1.9.0.drv",["out"]),("/gnu/store/999889hgqba38np9hqswml2px9v5p3mm-python-markdown-3.10.drv",["out"]),("/gnu/store/9q6q41khq5f6d2zqpaar2ds933g2r11z-python-typogrify-2.1.0.drv",["out"]),("/gnu/store/azbim3sh56721lnfc3r54cn4nij6629n-python-jinja2-3.1.2.drv",["out"]),("/gnu/store/b4096cawvhhqmw16adjqd5xqc7blhd9y-glibc-2.41.drv",["out","static"]),("/gnu/store/c18zwjasa094gg9ngl5l4xkwwfqdh7lz-guile-3.0.9.drv",["out"]),("/gnu/store/cmrpqf49chpg4jkzbg08pl607084wiy6-tar-1.35.drv",["out"]),("/gnu/store/d23dp6z581fy03krb8w3xsljr685ixqn-linux-libre-headers-6.12.17.drv",["out"]),("/gnu/store/dahxmsgr5g1q30r50m4frvffsap84i9i-gi-docgen-2025.4.drv",["out"]),("/gnu/store/dgzxhfbbj4lc5kfd8wz8jq2ng1j7q05z-pkg-config-0.29.2.drv",["out"]),("/gnu/store/dk1s5za9z31x3l5k2g5j92w5bq12fbsp-findutils-4.10.0.drv",["out"]),("/gnu/store/dmmzp028rydn980q6zzwb4h5c1a5psiq-gawk-5.3.0.drv",["out"]),("/gnu/store/dwpsrgjd64azcimz7pvnik8d149y2c6y-gcc-14.3.0.drv",["out"]),("/gnu/store/ghj8p20p63zh2ffj6bf6jhv38xrkp89f-sed-4.9.drv",["out"]),("/gnu/store/hyw0lbrgs08jrfxkhja5fkw2yhj6973x-glib-2.83.3.tar.zst.drv",["out"]),("/gnu/store/i4wk699p170bnbvp5pwy8cdjhwpc6zgj-python-3.11.14.drv",["out"]),("/gnu/store/ifda1ljsndmmgxy7wf0sya9ikifd959i-python-smartypants-2.0.2.drv",["out"]),("/gnu/store/ih3dxlr9z4lf1mhqd5m8yr9319rq1da2-gettext-minimal-0.23.1.drv",["out"]),("/gnu/store/l49zk72wc49jm6dkmchafhfp4ybb28xc-bash-minimal-5.2.37.drv",["out"]),("/gnu/store/ldzv4bzs354aih42ffyw72192svaynyn-perl-5.36.0.drv",["out"]),("/gnu/store/lp2j6vrchf6l14m95x0zhjxxrcikqngi-diffutils-3.12.drv",["out"]),("/gnu/store/m9q1l872hgz6b8s7yvca7b9527kn4njw-binutils-2.44.drv",["out"]),("/gnu/store/p0zf5fj4mgz2ylmcdb9vpb1cbqi75qfn-bash-minimal-5.2.37.drv",["out"]),("/gnu/store/pnaknvq67bf3iba3d8yplanjc3b4g7ij-grep-3.11.drv",["out"]),("/gnu/store/q0y84hk5qh6ayzr201glf3nr7kfbillk-libffi-3.4.6.drv",["out"]),("/gnu/store/qbg1w9bzpcnjd5bz9by09837ql7c96y2-ld-wrapper-0.drv",["out"]),("/gnu/store/qblkzckhn7pq7a2qfpdbnksj51ll4jzz-dbus-1.15.8.drv",["out"]),("/gnu/store/qicacllcw24zimbdfzcc2rk78hmmgdmp-bzip2-1.0.8.drv",["out"]),("/gnu/store/rc81h00fphz1lm2wgsamfzw8hx6nh374-python-pygments-2.19.1.drv",["out"]),("/gnu/store/rfczralhnnn21gvhxf7akiskph3wvz9x-gobject-introspection-1.82.0.drv",["out"]),("/gnu/store/rzhdj91f14alyyqy9nzxg2b398vmyq86-python-wrapper-3.11.14.drv",["out"]),("/gnu/store/skbxipqshzhgqax43rlsq20cbmryr4vm-module-import-compiled.drv",["out"]),("/gnu/store/xgb1hrd3lmhhklyjdx03gl6y21jkiwj5-python-markupsafe-3.0.2.drv",["out"]),("/gnu/store/zbaxcwmqdh9klh5c03iisgngj0238yly-python-six-1.17.0.drv",["out"])],["/gnu/store/dcq2ajaz0vhaj0j3m7wdfw3axwzrkp3c-glib-2.83.3-builder","/gnu/store/j6fmbrwhvwsbk0wka86xpxafs48v6nqj-module-import"],"x86_64-linux","/gnu/store/77cxm55d0ns4d4gza1xnd4frb1bc4im3-guile-3.0.9/bin/guile",["--no-auto-compile","-L","/gnu/store/j6fmbrwhvwsbk0wka86xpxafs48v6nqj-module-import","-C","/gnu/store/lbwpx5857x3aynblihk30p318azn8xfk-module-import-compiled","/gnu/store/dcq2ajaz0vhaj0j3m7wdfw3axwzrkp3c-glib-2.83.3-builder"],[("LC_CTYPE","C.UTF-8"),("bin","/gnu/store/nbd6d5csab3khdqxiw7r13kqajcwpd4r-glib-2.83.3-bin"),("debug","/gnu/store/d75qsh6w41s5y0rfn97z3pm8nq5f27hx-glib-2.83.3-debug"),("disallowedReferences","/gnu/store/1zwwykw79j5xz1iaiia56hwqxdqnrk2c-tzdata-2025a"),("doc","/gnu/store/03kagz2jlhfmnm9rhh9wrlg66xlhqprj-glib-2.83.3-doc"),("out","/gnu/store/xasxmfxl2kps1xxllbcm8p6abvcd58cq-glib-2.83.3"),("static","/gnu/store/rd67bzia7i1s1rs18bmw2cw2gr66dbxv-glib-2.83.3-static")])
+#+end_example
+
+看这输出一头雾水吗？不必担心，下面将逐步解释
+
+** 创建一个 <derivation>
+
+如果打开 guix 的源代码，查看 guix/derivations.scm 可以看到有以下定义， derivations 的定义是一个 record
+
+#+begin_src scheme
+  (define-immutable-record-type <derivation>
+  (make-derivation outputs inputs sources system builder args env-vars
+                   file-name)
+  derivation?
+  (outputs  derivation-outputs)      ; list of name/<derivation-output> pairs
+  (inputs   derivation-inputs)       ; list of <derivation-input>
+  (sources  derivation-sources)      ; list of store paths
+  (system   derivation-system)       ; string
+  (builder  derivation-builder)      ; store path
+  (args     derivation-builder-arguments)         ; list of strings
+  (env-vars derivation-builder-environment-vars)  ; list of name/value pairs
+  (file-name derivation-file-name))               ; the .drv file name
+#+end_src
+
+** 在 guix repl 中构建 derivation
+可以使用 ,lower 或者 lower-object 将 package define 转变成 derivation 或者 store item
+
+#+begin_example
+scheme@(guile-user)> ,use (guix)
+scheme@(guile-user)> ,use (gnu packages glib)
+scheme@(guile-user)> glib
+$1 = #<package glib@2.86.0 gnu/packages/glib.scm:448 7f87ffea9bb0>
+scheme@(guile-user)> ,lower glib
+$2 = #<derivation /gnu/store/15lk1yrv22izdn07q08470rld951yln5-glib-2.86.0.drv => /gnu/store/gjsllywm543ba987yhslfpxqjfhc4m04-glib-2.86.0-bin /gnu/store/zf2pgpxma4vjjnhlsm67yfbvpy664nzh-glib-2.86.0-debug /gnu/store/71ffz3bdgyg53ncyj7z7dykyax6vysv4-glib-2.86.0 /gnu/store/75ij7i0rxa2shy168mdvj2gcjhd805lb-glib-2.86.0-static 7f87fd9837d0>
+scheme@(guile-user)> (derivation-system $2)
+$3 = "x86_64-linux"
+#+end_example
+
+- ,use (guix) ，使用 (guix) module
+- ,use (gnu packages glib) ，使用 glib module ，使用 glib 的 pakcage define
+- glib ，输出 glib 的 binding ，可以看到第一个输出 ($1) 输出了一个 package define
+- ,lower glib ，使用 lower 构建一个 derivation ，这是输出 $2
+- derivation-system ，使用 derivation-system 查看输出 $2 的 derivation record 的 system 属性
+
+当然上面的操作是在 guix repl 里面进行的，接下来我们在 guile 程序文件中进行
+
+** 在 scheme 文件中构建 derivation
+
+pk 调试宏，在定义时使用 write 将输出打印在终端注释中
+
+#+begin_src scheme
+  (use-modules (guix)
+               (gnu packages glib))
+
+  (pk (lower-object glib))
+#+end_src
+
+#+begin_example
+;;; (#<procedure 7f8801e3a080 at guix/gexp.scm:294:2 (state)>)
+$1 = #<procedure 7f8801e3a080 at guix/gexp.scm:294:2 (state)>
+#+end_example
+
+可以看到输出是一个 procedure 在 gexp (G-Expression)里
+
+现在还没解释 G-Expression ，不过我们可以知道使用 pk 来直接打印输出
+
+现在可以使用 run-with-store 将输出的 G-Expression 构建成 derivation
+
+#+begin_src scheme
+  (use-modules (guix)
+               (guix derivations)
+               (guix gexp)
+               (guix packages)
+               (guix store)
+               (gnu packages glib))
+
+  (define glib-drv
+    (pk (with-store %store
+          (run-with-store %store
+            (lower-object glib)))))
+#+end_src
+
+#+begin_example
+;;; (#<derivation /gnu/store/1klr30hzvylr6kp0gpnb7dz32b3r13pi-glib-2.83.3.drv => /gnu/store/hxnsnqp9zhcrysgs32447l7a9jn4hvas-glib-2.83.3-bin /gnu/store/cgx1pz9krybwvmcqrn81v8rzgbh6xzi7-glib-2.83.3-debug /gnu/store/wvykg0f5nyfyav7k3pc0pdjpz8yks58j-glib-2.83.3 /gnu/store/m5d0pdgx3am588pg62ri5xh1qvq8kqff-glib-2.83.3-static 7f8ee4f9c500>)
+#+end_example
+
+现在得到了一个 derivation ，我们使用 derivation record 里的访问 procedure 访问其属性
+
+#+begin_src scheme
+  (define glib-outputs
+    (pk (derivation-outputs glib-drv)))
+#+end_src
+
+#+begin_example
+;;; ((("bin" . #<<derivation-output> path: "/gnu/store/hxnsnqp9zhcrysgs32447l7a9jn4hvas-glib-2.83.3-bin" hash-algo: #f hash: #f recursive?: #f>) ("debug" . #<<derivation-output> path: "/gnu/store/cgx1pz9krybwvmcqrn81v8rzgbh6xzi7-glib-2.83.3-debug" hash-algo: #f hash: #f recursive?: #f>) ("out" . #<<derivation-output> path: "/gnu/store/wvykg0f5nyfyav7k3pc0pdjpz8yks58j-glib-2.83.3" hash-algo: #f hash: #f recursive?: #f>) ("static" . #<<derivation-output> path: "/gnu/store/m5d0pdgx3am588pg62ri5xh1qvq8kqff-glib-2.83.3-static" hash-algo: #f hash: #f recursive?: #f>)))
+#+end_example
+
+** 详解 <derivation>
+
+*** <derivation-output>
+
+derivation-output 是一个 alist ，可以使用 assoc-ref 访问其属性
+
+#+begin_src scheme
+  (pk (assoc-ref glib-outputs "out"))
+#+end_src
+
+#+begin_example
+;;; (#<<derivation-output> path: "/gnu/store/wvykg0f5nyfyav7k3pc0pdjpz8yks58j-glib-2.83.3" hash-algo: #f hash: #f recursive?: #f>)
+$1 = #<<derivation-output> path: "/gnu/store/wvykg0f5nyfyav7k3pc0pdjpz8yks58j-glib-2.83.3" hash-algo: #f hash: #f recursive?: #f>
+#+end_example
+
+可以看到 hash 和 hash-algo 没有值，查看使用 guix build --derivations glib 的输出文件可以看到
+
+#+begin_example
+Derive([... , ("out" . #<<derivation-output> path: "/gnu/store/wvykg0f5nyfyav7k3pc0pdjpz8yks58j-glib-2.83.3" hash-algo: #f hash: #f recursive?: #f>), ... ])
+#+end_example
+
+是对应的
+
+可以构建 glib 的源代码包来获取 hash 和 hash-algo
+#+begin_src scheme
+  (use-modules (guix)
+               (guix derivations)
+               (guix gexp)
+               (guix packages)
+               (guix store)
+               (gnu packages glib))
+
+  (define glib-src-drv
+    (pk (with-store %store
+          (run-with-store %store
+            (lower-object (package-source glib))))))
+#+end_src
+
+#+begin_example
+;;; (#<derivation /gnu/store/hyw0lbrgs08jrfxkhja5fkw2yhj6973x-glib-2.83.3.tar.zst.drv => /gnu/store/0rhm7v75hxm4yldspdpb24zzs2akw6z1-glib-2.83.3.tar.zst 7f8ee4ec9b90>)
+#+end_example
+
+#+begin_src scheme
+  (define glib-src-outputs
+    (pk (derivation-outputs glib-src-drv)))
+#+end_src
+
+#+begin_example
+;;; ((("out" . #<<derivation-output> path: "/gnu/store/0rhm7v75hxm4yldspdpb24zzs2akw6z1-glib-2.83.3.tar.zst" hash-algo: #f hash: #f recursive?: #f>)))
+#+end_example
+
+#+begin_src scheme
+    (pk (assoc-ref glib-src-outputs "out"))
+#+end_src
+
+#+begin_example
+;;; (#<<derivation-output> path: "/gnu/store/0rhm7v75hxm4yldspdpb24zzs2akw6z1-glib-2.83.3.tar.zst" hash-algo: #f hash: #f recursive?: #f>)
+$1 = #<<derivation-output> path: "/gnu/store/0rhm7v75hxm4yldspdpb24zzs2akw6z1-glib-2.83.3.tar.zst" hash-algo: #f hash: #f recursive?: #f>
+#+end_example
+
+可以看到 hash 和 hash-algo 已经有值了
+
+*** derivation-input
+
+之前 guix build --derivations glib 的输出 .drv 里的第二个字段 (第二个 "[]" 里的内容)
+
+#+begin_example
+Derive(... , [("/gnu/store/13mfnsf82hbc8x6skdx6jywzvgm6zdp3-patch-2.7.6.drv",["out"]),("/gnu/store/2vjnv7mvr1s7ssxq85x3vcvi30v2xayb-python-pyparsing-3.2.3.drv",["out"]),("/gnu/store/30n7ps4aw7kj2cywv9clqilaqmrhr0rx-ninja-1.13.2.drv",["out"]),("/gnu/store/482qbdf67z1m15q0rg8zswi9yfr3vqpa-coreutils-9.1.drv",["out"]),("/gnu/store/4gr3sfaakkmhhcsvzbipc7d5l4w52hdv-zstd-1.5.6.drv",["out"]),("/gnu/store/518dcgk4sgy8573xfrivnqpkwg85bjgg-m4-1.4.19.drv",["out"]),("/gnu/store/55frf22sjqn5jfrg46za8vbc9fpckyqk-make-4.4.1.drv",["out"]),("/gnu/store/60a297ppwa6z4yndl36gx6rvq8ncx13n-file-5.46.drv",["out"]),("/gnu/store/72in2fpp6ixcvlg2r38n4fix5dgbfnxv-zlib-1.3.1.drv",["out"]),("/gnu/store/73i639pm0p29d0218nz92m4c6zfslkh0-xz-5.4.5.drv",["out"]),("/gnu/store/74ylcq016k5z7f3iqqvaijsgjpw0mfzd-python-packaging-25.0.drv",["out"]),("/gnu/store/78gafdwlhm823cyj6c0f6n3zl4r6v9lr-python-docutils-0.21.2.drv",["out"]),("/gnu/store/7nzw07mn4yvp61vcn0kncfy5kf0gjrr4-gzip-1.14.drv",["out"]),("/gnu/store/82lmcralzn78fxkakhrygwfyixr6nz00-pcre2-10.42.drv",["out"]),("/gnu/store/8j321wg9fll4llhn64vghkkhpsl1mdry-tzdata-2025a.drv",["out"]),("/gnu/store/8jzdi0wv2b9ghy0g54ydnq726ca50ldd-glib-2.83.3.drv",["out"]),("/gnu/store/8v12p5m3zn46znl9bmlfssxz1n4fvrvb-util-linux-2.40.4.drv",["lib"]),("/gnu/store/9267ajw5a1jr8bs13vpfxmg8gwnq9a11-meson-1.9.0.drv",["out"]),("/gnu/store/999889hgqba38np9hqswml2px9v5p3mm-python-markdown-3.10.drv",["out"]),("/gnu/store/9q6q41khq5f6d2zqpaar2ds933g2r11z-python-typogrify-2.1.0.drv",["out"]),("/gnu/store/azbim3sh56721lnfc3r54cn4nij6629n-python-jinja2-3.1.2.drv",["out"]),("/gnu/store/b4096cawvhhqmw16adjqd5xqc7blhd9y-glibc-2.41.drv",["out","static"]),("/gnu/store/c18zwjasa094gg9ngl5l4xkwwfqdh7lz-guile-3.0.9.drv",["out"]),("/gnu/store/cmrpqf49chpg4jkzbg08pl607084wiy6-tar-1.35.drv",["out"]),("/gnu/store/d23dp6z581fy03krb8w3xsljr685ixqn-linux-libre-headers-6.12.17.drv",["out"]),("/gnu/store/dahxmsgr5g1q30r50m4frvffsap84i9i-gi-docgen-2025.4.drv",["out"]),("/gnu/store/dgzxhfbbj4lc5kfd8wz8jq2ng1j7q05z-pkg-config-0.29.2.drv",["out"]),("/gnu/store/dk1s5za9z31x3l5k2g5j92w5bq12fbsp-findutils-4.10.0.drv",["out"]),("/gnu/store/dmmzp028rydn980q6zzwb4h5c1a5psiq-gawk-5.3.0.drv",["out"]),("/gnu/store/dwpsrgjd64azcimz7pvnik8d149y2c6y-gcc-14.3.0.drv",["out"]),("/gnu/store/ghj8p20p63zh2ffj6bf6jhv38xrkp89f-sed-4.9.drv",["out"]),("/gnu/store/hyw0lbrgs08jrfxkhja5fkw2yhj6973x-glib-2.83.3.tar.zst.drv",["out"]),("/gnu/store/i4wk699p170bnbvp5pwy8cdjhwpc6zgj-python-3.11.14.drv",["out"]),("/gnu/store/ifda1ljsndmmgxy7wf0sya9ikifd959i-python-smartypants-2.0.2.drv",["out"]),("/gnu/store/ih3dxlr9z4lf1mhqd5m8yr9319rq1da2-gettext-minimal-0.23.1.drv",["out"]),("/gnu/store/l49zk72wc49jm6dkmchafhfp4ybb28xc-bash-minimal-5.2.37.drv",["out"]),("/gnu/store/ldzv4bzs354aih42ffyw72192svaynyn-perl-5.36.0.drv",["out"]),("/gnu/store/lp2j6vrchf6l14m95x0zhjxxrcikqngi-diffutils-3.12.drv",["out"]),("/gnu/store/m9q1l872hgz6b8s7yvca7b9527kn4njw-binutils-2.44.drv",["out"]),("/gnu/store/p0zf5fj4mgz2ylmcdb9vpb1cbqi75qfn-bash-minimal-5.2.37.drv",["out"]),("/gnu/store/pnaknvq67bf3iba3d8yplanjc3b4g7ij-grep-3.11.drv",["out"]),("/gnu/store/q0y84hk5qh6ayzr201glf3nr7kfbillk-libffi-3.4.6.drv",["out"]),("/gnu/store/qbg1w9bzpcnjd5bz9by09837ql7c96y2-ld-wrapper-0.drv",["out"]),("/gnu/store/qblkzckhn7pq7a2qfpdbnksj51ll4jzz-dbus-1.15.8.drv",["out"]),("/gnu/store/qicacllcw24zimbdfzcc2rk78hmmgdmp-bzip2-1.0.8.drv",["out"]),("/gnu/store/rc81h00fphz1lm2wgsamfzw8hx6nh374-python-pygments-2.19.1.drv",["out"]),("/gnu/store/rfczralhnnn21gvhxf7akiskph3wvz9x-gobject-introspection-1.82.0.drv",["out"]),("/gnu/store/rzhdj91f14alyyqy9nzxg2b398vmyq86-python-wrapper-3.11.14.drv",["out"]),("/gnu/store/skbxipqshzhgqax43rlsq20cbmryr4vm-module-import-compiled.drv",["out"]),("/gnu/store/xgb1hrd3lmhhklyjdx03gl6y21jkiwj5-python-markupsafe-3.0.2.drv",["out"]),("/gnu/store/zbaxcwmqdh9klh5c03iisgngj0238yly-python-six-1.17.0.drv",["out"])], ...)
+#+end_example
+
+这个元组显示了 build glib 前需要构建的 derivations
+
+当然，访问 derivation-input 可以使用相似的方式
+
+#+begin_src scheme
+  (define glib-inputs
+    (pk (derivation-inputs glib-drv)))
+#+end_src
+
+#+begin_src scheme
+  (pk (car glib-inputs))
+#+end_src
+
+#+begin_example
+;;; (#<<derivation-input> drv: #<derivation /gnu/store/13mfnsf82hbc8x6skdx6jywzvgm6zdp3-patch-2.7.6.drv => /gnu/store/3yky2jh15qsknnxnzplhj4by14sqmfig-patch-2.7.6 7f8ee5a91a00> sub-derivations: ("out")>)
+$1 = #<<derivation-input> drv: #<derivation /gnu/store/13mfnsf82hbc8x6skdx6jywzvgm6zdp3-patch-2.7.6.drv => /gnu/store/3yky2jh15qsknnxnzplhj4by14sqmfig-patch-2.7.6 7f8ee5a91a00> sub-derivations: ("out")>
+#+end_exampler
+
+*** Build Configuration
+
+第三个元组是 derivation-sources
+
+#+begin_example
+Derive(... , ["/gnu/store/dcq2ajaz0vhaj0j3m7wdfw3axwzrkp3c-glib-2.83.3-builder","/gnu/store/j6fmbrwhvwsbk0wka86xpxafs48v6nqj-module-import"], ...)
+#+end_example
+
+- /gnu/store/dcq2ajaz0vhaj0j3m7wdfw3axwzrkp3c-glib-2.83.3-builder 是 glib 的构建脚本
+- /gnu/store/j6fmbrwhvwsbk0wka86xpxafs48v6nqj-module-import 是将被添加到 %load-path 的额外路径
+
+可以通过 derivation-source 访问
+
+#+begin_src scheme
+  (pk (derivation-sources glib-drv))
+#+end_src
+
+#+begin_example
+;;; (("/gnu/store/6kg7cn4nh9cjfdgk7yj2rhw8fs6cxa60-glib-2.83.3-builder" "/gnu/store/j6fmbrwhvwsbk0wka86xpxafs48v6nqj-module-import"))
+$1 = ("/gnu/store/6kg7cn4nh9cjfdgk7yj2rhw8fs6cxa60-glib-2.83.3-builder" "/gnu/store/j6fmbrwhvwsbk0wka86xpxafs48v6nqj-module-import")
+#+end_example
+
+剩下部分访问同理
+
+#+begin_src scheme
+  (pk (derivation-system glib-drv))
+#+end_src
+
+#+begin_example
+;;; ("x86_64-linux")
+$2 = "x86_64-linux"
+#+end_example
+
+#+begin_src scheme
+  (pk (derivation-builder glib-drv))
+#+end_src
+
+#+begin_example
+;;; ("/gnu/store/77cxm55d0ns4d4gza1xnd4frb1bc4im3-guile-3.0.9/bin/guile")
+$3 = "/gnu/store/77cxm55d0ns4d4gza1xnd4frb1bc4im3-guile-3.0.9/bin/guile"
+#+end_example
+
+#+begin_src scheme
+  (pk (derivation-builder-arguments glib-drv))
+#+end_src
+
+#+begin_example
+;;; (("--no-auto-compile" "-L" "/gnu/store/j6fmbrwhvwsbk0wka86xpxafs48v6nqj-module-import" "-C" "/gnu/store/lbwpx5857x3aynblihk30p318azn8xfk-module-import-compiled" "/gnu/store/6kg7cn4nh9cjfdgk7yj2rhw8fs6cxa60-glib-2.83.3-builder"))
+$4 = ("--no-auto-compile" "-L" "/gnu/store/j6fmbrwhvwsbk0wka86xpxafs48v6nqj-module-import" "-C" "/gnu/store/lbwpx5857x3aynblihk30p318azn8xfk-module-import-compiled" "/gnu/store/6kg7cn4nh9cjfdgk7yj2rhw8fs6cxa60-glib-2.83.3-builder")
+#+end_example
+
+最后一个字段包含在构建时的环境变量列表
+
+#+begin_src scheme
+  (pk (derivation-builder-environment-vars glib-drv))
+#+end_src
+
+#+begin_example
+;;; ((("LC_CTYPE" . "C.UTF-8") ("bin" . "/gnu/store/hxnsnqp9zhcrysgs32447l7a9jn4hvas-glib-2.83.3-bin") ("debug" . "/gnu/store/cgx1pz9krybwvmcqrn81v8rzgbh6xzi7-glib-2.83.3-debug") ("disallowedReferences" . "/gnu/store/1zwwykw79j5xz1iaiia56hwqxdqnrk2c-tzdata-2025a") ("out" . "/gnu/store/wvykg0f5nyfyav7k3pc0pdjpz8yks58j-glib-2.83.3") ("static" . "/gnu/store/m5d0pdgx3am588pg62ri5xh1qvq8kqff-glib-2.83.3-static")))
+$5 = (("LC_CTYPE" . "C.UTF-8") ("bin" . "/gnu/store/hxnsnqp9zhcrysgs32447l7a9jn4hvas-glib-2.83.3-bin") ("debug" . "/gnu/store/cgx1pz9krybwvmcqrn81v8rzgbh6xzi7-glib-2.83.3-debug") ("disallowedReferences" . "/gnu/store/1zwwykw79j5xz1iaiia56hwqxdqnrk2c-tzdata-2025a") ("out" . "/gnu/store/wvykg0f5nyfyav7k3pc0pdjpz8yks58j-glib-2.83.3") ("static" . "/gnu/store/m5d0pdgx3am588pg62ri5xh1qvq8kqff-glib-2.83.3-static"))
+#+end_example
+
+** 使用 <derivation>
+
+<derivation> 与 .drv 文件之间的转换可以使用 write-derivation, read-derivation 和 read-derivation-from-file
+
+#+begin_src scheme
+  (define manual-drv
+    (with-store %store
+      (derivation %store "manual"
+                  "/bin/sh" '())))
+
+  (write-derivation manual-drv (current-output-port))
+#+end_src
+
+#+begin_example
+Derive([("out","/gnu/store/9zzigy9l9wxk6nv1vz4s6k5mi576km38-manual","","")],[],[],"x86_64-linux","/bin/sh",[],[("out","/gnu/store/9zzigy9l9wxk6nv1vz4s6k5mi576km38-manual")])
+#+end_example
+
+#+begin_src scheme
+  (pk (read-derivation-from-file (derivation-file-name glib-drv)))
+#+end_src
+
+#+begin_example
+;;; (#<derivation /gnu/store/1klr30hzvylr6kp0gpnb7dz32b3r13pi-glib-2.83.3.drv => /gnu/store/hxnsnqp9zhcrysgs32447l7a9jn4hvas-glib-2.83.3-bin /gnu/store/cgx1pz9krybwvmcqrn81v8rzgbh6xzi7-glib-2.83.3-debug /gnu/store/wvykg0f5nyfyav7k3pc0pdjpz8yks58j-glib-2.83.3 /gnu/store/m5d0pdgx3am588pg62ri5xh1qvq8kqff-glib-2.83.3-static 7f8ee4f9c500>)
+$6 = #<derivation /gnu/store/1klr30hzvylr6kp0gpnb7dz32b3r13pi-glib-2.83.3.drv => /gnu/store/hxnsnqp9zhcrysgs32447l7a9jn4hvas-glib-2.83.3-bin /gnu/store/cgx1pz9krybwvmcqrn81v8rzgbh6xzi7-glib-2.83.3-debug /gnu/store/wvykg0f5nyfyav7k3pc0pdjpz8yks58j-glib-2.83.3 /gnu/store/m5d0pdgx3am588pg62ri5xh1qvq8kqff-glib-2.83.3-static 7f8ee4f9c500>
+#+end_example
+
+#+begin_src scheme
+  (call-with-input-file (derivation-file-name glib-drv)
+    read-derivation)
+#+end_src
+
+#+begin_example
+$7 = #<derivation /gnu/store/1klr30hzvylr6kp0gpnb7dz32b3r13pi-glib-2.83.3.drv => /gnu/store/hxnsnqp9zhcrysgs32447l7a9jn4hvas-glib-2.83.3-bin /gnu/store/cgx1pz9krybwvmcqrn81v8rzgbh6xzi7-glib-2.83.3-debug /gnu/store/wvykg0f5nyfyav7k3pc0pdjpz8yks58j-glib-2.83.3 /gnu/store/m5d0pdgx3am588pg62ri5xh1qvq8kqff-glib-2.83.3-static 7f8ee5087500>
+#+end_example
+
+可以使用 build-derivations 构建 <derivation>
+
+#+begin_src scheme
+  (use-modules (ice-9 ftw))
+
+  (define glib-drv-out
+    (pk (derivation-output-path
+         (assoc-ref (derivation-outputs glib-drv) "out"))))
+#+end_src
+
+#+begin_example
+;;; ("/gnu/store/wvykg0f5nyfyav7k3pc0pdjpz8yks58j-glib-2.83.3")
+#+end_example
+
+检查 glib-drv-out 目录，得到 #f ，也就是目录为空
+#+begin_src scheme
+  (pk (scandir glib-drv-out))
+#+end_src
+
+#+begin_example
+;;; (#f)
+$8 = #f
+#+end_example
+
+#+begin_src scheme
+  (pk (with-store %store (build-derivations %store (list glib-drv))))
+#+end_src
+
+#+begin_example
+;;; (#t)
+$9 = #t
+#+end_example
+
+到这里返回 #t 就构建成功了
+
+检查 glib-drv-out 目录
+
+#+begin_src scheme
+  (pk (scandir glib-drv-out))
+#+end_src
+
+#+begin_example
+;;; (("." ".." "etc" "include" "lib" "libexec" "share"))
+$10 = ("." ".." "etc" "include" "lib" "libexec" "share")
+#+end_example
+
+可以看到已经输出了构建项
+
+** 总结
+
+1. derivation-outputs derivation的各种输出路径
+2. derivation-inputs 需要 build 的其他 derivation
+3. derivation-sources 构建 script 和 被添加到 %load-path 的路径
+4. derivation-system 编译的目标系统类型
+5. derivation-builder 目标的可执行文件
+6. derivation-builder-arguments 将要传递给 build 的 arguments (参数)
+7. derivation-builder-environment-vars 在 build 过程中设置的环境变量
+
+* G-Expressions
+Guix 需要一些在构建软件包时运行的代码，为了创建一个在相对输出目录里的文件，还需要某种方式来引用依赖关系。
+G-Expressions 用来实现这个"被推迟"的代码？
+
+联系上一节 derivation-source 的元组中第一个元素“构建脚本”，脚本中定义了 build-phases, %build-inputs, %outputs, %output
+
+可以在构建时引用构建脚本里的定义，使用 S-Expressions 构建一个 store item 的 bin/glib 文件 glib包装
+
+#+begin_src scheme
+  (define sexp-builder
+    `(let* ((out (assoc-ref %outputs "out"))
+            (glib (assoc-ref %build-inputs "glib"))
+            (bin/glib (string-append glib "/bin/glib")))
+       (symlink bin/glib out)))
+#+end_src
+
+%outputs 和 %build-inputs 在构建脚本中以 alist 定义
+
+#+begin_src scheme
+  (define %build-inputs
+      (quote
+       (("meson"
+         . "/gnu/store/a5486v6zy33hcqrsx0d906qwxkxnldxp-meson-1.9.0")
+        ("ninja"
+         . "/gnu/store/248kk7119nrvq9y7k2dzbaz0qv96kbqw-ninja-1.13.2")
+        ("gobject-introspection"
+         . "/gnu/store/2qij8ly3kbjwdbxl6far9ip9nhw79mim-gobject-introspection-1.82.0")
+        ("dbus"
+         . "/gnu/store/dwpdndzjray1a45dgrbyg1hs3ms8z1m5-dbus-1.15.8")
+        ("gettext-minimal"
+         . "/gnu/store/5c5y9q78qf4d5pzmxvvn4irigx06m0h6-gettext-minimal-0.23.1")
+        ("m4"
+         . "/gnu/store/12h5bwhbl29ha47bqrrhdp499cbiaxlg-m4-1.4.19")
+        ("perl"
+         . "/gnu/store/ns98r6hs7kaqp91r8nmw6rbsdl0l6wh2-perl-5.36.0")
+        ("pkg-config"
+         . "/gnu/store/3b41as1rgymz766iv8pk7p34dma6blhi-pkg-config-0.29.2")
+        ("python"
+         . "/gnu/store/pv50hmdxs15c32laa1vn03wkfl023wwk-python-3.11.14")
+        ("python-wrapper"
+         . "/gnu/store/xjqzrfa27sl7kd1dii40vsk77sclbzqg-python-wrapper-3.11.14")
+        ("tzdata"
+         . "/gnu/store/1zwwykw79j5xz1iaiia56hwqxdqnrk2c-tzdata-2025a")
+        ("gi-docgen"
+         . "/gnu/store/lpblra1d4ndq559gcwdfjgvy3613iv8d-gi-docgen-2025.4")
+        ("python-docutils"
+         . "/gnu/store/z1dhjipnzd681033cvpvijv73rmkzl30-python-docutils-0.21.2")
+        ("bash-minimal"
+         . "/gnu/store/9pi8kah55s964qfik4cqysjdq74ll4sv-bash-minimal-5.2.37")
+        ("libffi"
+         . "/gnu/store/qvp9pb46k3qnpgb6sx7cjzfpcrkkqgnp-libffi-3.4.6")
+        ("pcre2"
+         . "/gnu/store/agdqkcaybihqgjiwq9s9kz5mqsxwdjdv-pcre2-10.42")
+        ("util-linux"
+         . "/gnu/store/z0pq3qzpbi48g6f07bb561qr9081q7zc-util-linux-2.40.4-lib")
+        ("zlib"
+         . "/gnu/store/a2jnc1avp7jdyp01r9kpp8q1i72kk8g0-zlib-1.3.1")
+        ("tar"
+         . "/gnu/store/x5nk7jclncdrrsjhpmjjfl2z9p36bxyw-tar-1.35")
+        ("gzip"
+         . "/gnu/store/vcmbby8alqahhhd5qnidpf5pbvr102jl-gzip-1.14")
+        ("bzip2"
+         . "/gnu/store/j2bib9ysq7f3369gjg6hv1kp24g07472-bzip2-1.0.8")
+        ("file"
+         . "/gnu/store/plifc9akxxfyjjbnh10dj350nxbhc399-file-5.46")
+        ("diffutils"
+         . "/gnu/store/d7q1jypzi0hjx0gf2034yzljvapy7fvy-diffutils-3.12")
+        ("patch"
+         . "/gnu/store/3yky2jh15qsknnxnzplhj4by14sqmfig-patch-2.7.6")
+        ("findutils"
+         . "/gnu/store/nfs39m8hsbx905q5kgjiw1irfrllkk00-findutils-4.10.0")
+        ("gawk"
+         . "/gnu/store/xmqvvby6vlmhbi3q913ck5marh6p86av-gawk-5.3.0")
+        ("zstd"
+         . "/gnu/store/d4bzgx28m0640plahv0x3h5hxlh1npnj-zstd-1.5.6")
+        ("sed" . "/gnu/store/5a3p82yj9nrj6rhk11f7b2sb84wirc2k-sed-4.9")
+        ("grep"
+         . "/gnu/store/1lkl6hik16bbhpjjsl825fivp2dsr9vi-grep-3.11")
+        ("xz" . "/gnu/store/gd41pn8r5723cyd6d79q9riqjbi070zz-xz-5.4.5")
+        ("coreutils"
+         . "/gnu/store/pai3hvsiihllqi03b2198qi5qq9a28ga-coreutils-9.1")
+        ("make"
+         . "/gnu/store/jkxm9drwlxkmb53zn1sd7w2wxdvpbj32-make-4.4.1")
+        ("bash"
+         . "/gnu/store/k66i68s5l93n1lgxp29vn2292nsywp1v-bash-minimal-5.2.37")
+        ("ld-wrapper"
+         . "/gnu/store/pazcfyngzb35khc8ad33dmsb22ibnl80-ld-wrapper-0")
+        ("binutils"
+         . "/gnu/store/c8mp7qq5az7cbnvmxgj2bjkscsf5h9ri-binutils-2.44")
+        ("gcc"
+         . "/gnu/store/wssvk5s5akbx78kx92bdkirrry87jvbj-gcc-14.3.0")
+        ("libc"
+         . "/gnu/store/yj053cys0724p7vs9kir808x7fivz17m-glibc-2.41")
+        ("libc:static"
+         . "/gnu/store/q1s19kv8bdq9ssfdgznzgkmfmj90vdfd-glibc-2.41-static")
+        ("source"
+         . "/gnu/store/0rhm7v75hxm4yldspdpb24zzs2akw6z1-glib-2.83.3.tar.zst")
+        ("glib"
+         . "/gnu/store/2hs9hprrbpv84fr4fajz5asashfhyr22-glib-2.83.3")
+        ("python-typogrify"
+         . "/gnu/store/nm43n90lqjqv987lcc3qhff3gvkvcg77-python-typogrify-2.1.0")
+        ("python-pygments"
+         . "/gnu/store/bxgfprax1m09cj9bp6psgincypj4bn06-python-pygments-2.19.1")
+        ("python-packaging"
+         . "/gnu/store/bmznmca62issk4qmjm6wgr3kp37pc8qk-python-packaging-25.0")
+        ("python-markupsafe"
+         . "/gnu/store/0zhqwwmd5n1fhswryk7z2xp9slj3saf9-python-markupsafe-3.0.2")
+        ("python-markdown"
+         . "/gnu/store/ssl6lfm5yg8v5s2ywd27v9571irmpxwn-python-markdown-3.10")
+        ("python-jinja2"
+         . "/gnu/store/6binjq3w81z3rj24wdf414bl7sci70kp-python-jinja2-3.1.2")
+        ("kernel-headers"
+         . "/gnu/store/90qwxdmdw7jdf0dkkgdgxln6b5a57kzx-linux-libre-headers-6.12.17")
+        ("python-smartypants"
+         . "/gnu/store/97y786nrph8gzra2cy2w62c5a51g2win-python-smartypants-2.0.2")
+        ("python-six"
+         . "/gnu/store/b90r304qyp0cckcycxj1xcjp2lx7g8z5-python-six-1.17.0")
+        ("python-pyparsing"
+         . "/gnu/store/hjiv53q3rghr4a3hq4pa62gmz8l0vhw4-python-pyparsing-3.2.3"))))
+  (define %outputs
+      (list (cons "doc" ((@ (guile) getenv) "doc"))
+            (cons "out" ((@ (guile) getenv) "out"))
+            (cons "static" ((@ (guile) getenv) "static"))
+            (cons "bin" ((@ (guile) getenv) "bin"))
+            (cons "debug" ((@ (guile) getenv) "debug"))))
+#+end_src
+
+可以使用 assoc-ref 访问 alist
+
+#+begin_src scheme
+  (assoc-ref %build-inputs "meson")
+#+end_src
+
+#+begin_example
+$1 = "/gnu/store/a5486v6zy33hcqrsx0d906qwxkxnldxp-meson-1.9.0"
+#+end_example
+
+- %outputs 将 derivation 的 outputs 推导到 store item 名称默认输出为 out
+- %build-inputs 将 derivation 的 inputs 推导到 store item 名称
+
+现在我们将 sexp-builder 变成 derivation ，并加以说明 "glib" 是 glib-drv ，最后使用 build-expression->derivation 将 sexp 构建
+
+#+begin_src scheme
+  (use-modules (guix derivations)
+               (guix packages)
+               (guix store)
+               (gnu packages guile)
+               (gnu packages glib))
+
+  (with-store store
+    (let ((guile-3.0-drv (package-derivation store guile-3.0))
+          (glib-drv (package-derivation store glib)))
+      (build-expression->derivation store "glib-symlink" sexp-builder
+                                    #:guile-for-build guile-3.0-drv
+                                    #:inputs `(("glib" ,glib-drv)))))
+#+end_src
+
+#+begin_example
+warning: 'build-expression->derivation' is deprecated, use 'gexp->derivation' instead
+$2 = #<derivation /gnu/store/whrai76416xyk0bqp80dhpr4pm2xza8h-glib-symlink.drv => /gnu/store/8h2p2w7nnhnx8n9g3inamly76504j62c-glib-symlink 7f48b8f70cd0>
+#+end_example
+
+这里提示 build-expression->derivation 不再推荐使用，我们可以注意到以下问题
+
+- #:inputs ，必须是 derivations ，所以需要事先使用 package-derivation 将 glib 的 package define 转变成 derivation
+- #:guile-for-build 没有默认值，还需要填入构建需要使用的 guile 的 derivation
+- build-expression->derivation 和 package-derivation 不是 monadic ，没有 monad 统一处理输入输出，不直观
+
+S-Expressions 的构建方式问题很多， G-Expressions 用于解决这些问题
+
+** 前置条件
+
+G-Expressions 本质上是一种 record 类型 <gexp>
+
+#+begin_src scheme
+  (define-record-type <gexp>
+    (make-gexp references modules extensions proc location)
+    gexp?
+    (references gexp-references)                    ;list of <gexp-input>
+    (modules    gexp-self-modules)                  ;list of module names
+    (extensions gexp-self-extensions)               ;list of lowerable things
+    (proc       gexp-proc)                          ;procedure
+    (location   %gexp-location))
+#+end_src
+
+最重要的两个属性是
+
+- proc 一个 procedure 返回相应的 S-Expression
+- references G-Expressions 需要用到的 input ，储存在 <gexp-input> 中
+
+示例 sexp-builder 的 G-Expressions 版本
+
+#+begin_src scheme
+  (use-modules (guix gexp)
+               (gnu packages glib))
+
+  (define gexp-builder
+    #~(symlink #$(file-append glib "/bin/glib")
+               #$output))
+#+end_src
+
+这更简洁，为了实现 G-Expressions 需要使用 #~ 语法，这是 gexp 的宏。 (注意与 S-Expressions quasiquote 的区分)
+
+| G-Expressions     | G-Expressions                | S-Expressions | S-Expressions           |
+|-------------------+------------------------------+---------------+-------------------------|
+| #~exp             | (gexp exp)                   | `data         | (quasiquote data)       |
+|-------------------+------------------------------+---------------+-------------------------|
+| #$obj             | (ungexp obj)                 | ,expr         | (unquote expr)          |
+| #$output[:output] | (ungexp obj output)          |               |                         |
+| #+obj             | (ungexp-native obj)          |               |                         |
+| #+obj:output      | (ungexp-native obj output)   |               |                         |
+|-------------------+------------------------------+---------------+-------------------------|
+| #$@lst            | (ungexp-splicing lst)        | ,@expr        | (unquote-splicing expr) |
+| #+@lst            | (ungexp-native-splicing lst) |               |                         |
+
+希望嵌入外部值为参考时，使用 #$ 或者 ungexp ，可以接受四种类型
+
+- S-Expressions (string, list ...) 将字面值嵌入
+- 其他 G-Expressions 字面值
+- 返回值可以被 lowred 成一个 derivation 的表达式，例如 <package> ， 可以 out 到 store item ；
+  如果表达式是可构建对象绑定的 symbol , 例如 (gnu pakcages glib) 里 define-public 定义的 package define ，则可以使用 package:lib ，
+  但是不能使用 (get-package):lib
+- output ，就像可构建对象绑定的 symbol 一样， output:out 嵌入 G-Expressions 构建的 derivation-outputs 的 out
+
+#+begin_src scheme
+  #~(list #$"foobar"                         ;s-expression
+        #$#~(string-append "foo" "bar")    ;g-expression
+        #$(file-append glib "/bin/irssi") ;buildable object (expression)
+        #$glib:bin                         ;buildable object (symbol)
+        #$output:out)                      ;output
+#+end_src
+
+#+begin_example
+$3 = #<gexp (list #<gexp-input "foobar":out>
+     #<gexp-input #<gexp (string-append "foo" "bar") 7feede4f5cf0>:out>
+     #<gexp-input #<file-append #<package glib@2.86.0 gnu/packages/glib.scm:448 7feeee9e38f0> "/bin/irssi">:out>
+     #<gexp-input #<package glib@2.86.0 gnu/packages/glib.scm:448 7feeee9e38f0>:bin>
+     #<gexp-output out>) 7feede4f5cc0>
+#+end_example
+
+理解了 G-Expressions ，现在将 G-Expressions 转变成 derivation (这一过程被称为 lowering) ，使用 lower-gexp monadic 将 proc 和 references 结合生成 <lowered-gexp> record
+它是 G-Expressions 到 derivation 的中间数据类型
+
+#+begin_src scheme
+  (define lowered-gexp-builder
+    (with-store store
+      (run-with-store store
+        (lower-gexp gexp-builder))))
+
+  (lowered-gexp-sexp lowered-gexp-builder)
+#+end_src
+
+#+begin_example
+$4 = (symlink "/gnu/store/71ffz3bdgyg53ncyj7z7dykyax6vysv4-glib-2.86.0/bin/glib" ((@ (guile) getenv) "out"))
+#+end_example
+
+有了 $4 这个由 G-Expressions 编译而成的 S-Expressions ，即可写入 store 的构建脚本文件中，那么如何转换成 derivation 呢？
+实际上没有用于 lowered 的 G-Expressions 转换成 derivation 的接口， 只有一个用于将常规的 G-Expressions 转换成 derivation 的工具，这工具最开始使用了 lower-gexp 然后实现上述内容内部转换，而不是将其外包给其他 procedure
+
+不出所料，这个 procedure 被称为 gexp->derivation ，与 S-Expression (build-expression->derivation 和 monads 系统出现之后在 Guix 中被弃用的 procedure) 不同，这是个 monadic 。
+
+#+begin_src scheme
+  (with-store store
+    (run-with-store store
+      (gexp->derivation "glib-symlink" gexp-builder)))
+#+end_src
+
+#+begin_example
+$5 = #<derivation /gnu/store/vpfy2gnihpdm0qp1p9kf3gk298qx2ygi-glib-symlink.drv => /gnu/store/lbiich3bxh0hlfb01mhr77d0pq0z3s75-glib-symlink 7feede1f90f0>
+#+end_example
+
+最后对比一下 S-Expressions 构建 derivation 的代码
+
+#+begin_src scheme
+  (use-modules (guix derivations)
+               (guix packages)
+               (guix store)
+               (gnu packages guile)
+               (gnu packages glib))
+
+  (define sexp-builder
+    `(let* ((out (assoc-ref %outputs "out"))
+            (glib (assoc-ref %build-inputs "glib"))
+            (bin/glib (string-append glib "/bin/glib")))
+       (symlink bin/glib out)))
+
+  (with-store store
+    (let ((guile-3.0-drv (package-derivation store guile-3.0))
+          (glib-drv (package-derivation store glib)))
+      (build-expression->derivation store "glib-symlink" sexp-builder
+                                    #:guile-for-build guile-3.0-drv
+                                    #:inputs `(("glib" ,glib-drv)))))
+#+end_src
+
+这是 G-Expressions 的等价代码
+
+#+begin_src scheme
+  (use-modules (guix gexp)
+               (guix store)
+               (gnu packages glib))
+
+  (define gexp-builder
+    #~(symlink #$(file-append glib "/bin/glib")
+               #$output))
+
+  (with-store store
+    (run-with-store store
+      (gexp->derivation "glib-symlink" gexp-builder))
+#+end_src
+
+这虽然被高度抽象化了，但是为了更多的复杂的 packages define 和 services define ， G-Expressions 是救命稻草，你可以在 inputs 中像引用字符串那样引用 output 路径。
+有时，你需要注意使用 ungexp-native (写作 #+) 比普通 ungexp 更可取的情况
+
+偏离一下话题，如果你想要看到 <gexp> record 里面的东西，但是又不想构建任何东西，你可以使用 gexp->approximate-sexp procedure ，用虚拟值取代所有 reference
+
+#+begin_src scheme
+  (gexp->approximate-sexp gexp-builder)
+#+end_src
+
+#+begin_example
+$6 = (symlink (*approximate*) (*approximate*))
+#+end_example
+
+** Lowerable-Object 基础设施
+
+目前已经出现过两个可以转化成 derivation 的 record ，通常将这类 record 称为 lowerable object 或者 file-like objects
+
+- <package> ，一个 Guix package define
+- <file-append> ，使用 ungexp 时，包装另外的 lowerable object 并追加一个 string 后缀到 output 路径
+
+还有更多可以使用的。在 monads 提供两个 procedure
+- text-file name text [references]
+  返回一个将 text 储存到 store 中文件名为 (string-append hash name) 的文件的绝对路径的 monadic ， references 是上述文件生成所需的 references 默认为空列表
+- interned-file file [name] [#:recursive? #t] [#:select? (const #t)]
+  返回内容为 file 的文件内容，名字为 (string-append hash name) 的文件的 store 绝对路径， recursive? 为 #t 时递归的将子目录一起复制到 store ，如果 recursive? 为 #t ，递归运行 (select? file stat) 其中 file 时文件的绝对路径， stat 时 lstat 的结果
+
+不过这些 procedure 在 G-Expressions 中并不好用，需要在 ungexp 时将其包裹在 (with-store store (run-with-store store ...)) 中，这相当乏味
+值得庆幸的是，在 (guix gexp) 提供 plain-file 和 local-file 来填补这块空白，示例
+
+#+begin_src scheme
+  (use-modules (guix monads)
+               (guix store)
+               (guix gexp)
+               (guix derivation)
+               (ice-9 ftw)
+               (ice-9 textual-ports))
+
+  (define (build-derivation monadic-drv)
+    (with-store store
+      (run-with-store store
+        (mlet* %store-monad ((drv monadic-drv))
+          (mbegin %store-monad
+            ;; BUILT-DERIVATIONS is the monadic version of BUILD-DERIVATIONS.
+            (built-derivations (list drv))
+            (return (derivation-output-path
+                     (assoc-ref (derivation-outputs drv) "out"))))))))
+
+  (define world-greeting-output
+    (build-derivation
+     (gexp->derivation "world-greeting"
+                       #~(begin
+                           (mkdir #$output)
+                           (symlink #$(plain-file "hi-world"
+                                                  "Hi, world!")
+                                    (string-append #$output "/hi"))
+                           (symlink #$(plain-file "hello-world"
+                                                  "Hello, world!")
+                                    (string-append #$output "/hello"))
+                           (symlink #$(plain-file "greetings-world"
+                                                  "Greetings, world!")
+                                    (string-append #$output "/greetings"))))))
+
+  ;; We turn the list into multiple values using (APPLY VALUES …).
+  (apply values
+         (map (lambda (file-path)
+                (let* ((path (string-append world-greeting-output "/" file-path))
+                       (contents (call-with-input-file path get-string-all)))
+                  (list path contents)))
+              ;; SCANDIR from (ICE-9 FTW) returns the list of all files in a
+              ;; directory (including ``.'' and ``..'', so we remove them with the
+              ;; second argument, SELECT?, which specifies a predicate).
+              (scandir world-greeting-output
+                       (lambda (path)
+                         (not (or (string=? path ".")
+                                  (string=? path "..")))))))
+#+end_src
+
+#+begin_example
+$1 = ("/gnu/store/0vcfpisy9hg17kxyvkib8gnxxmj0wmhg-world-greeting/greetings" "Greetings, world!")
+$2 = ("/gnu/store/0vcfpisy9hg17kxyvkib8gnxxmj0wmhg-world-greeting/hello" "Hello, world!")
+$3 = ("/gnu/store/0vcfpisy9hg17kxyvkib8gnxxmj0wmhg-world-greeting/hi" "Hi, world!")
+#+end_example
+
+注意，为了构建输出这里定义了一个 procedure ；下面将需要风格非常相似地构建 derivation ，所以让 world-greeting-output 重复使用而不是复制代码
+
+在 gexp 库中，还有许多有用的模块。包括
+- computed-file
+- program-file
+- mixed-file
+
+那么，你可能在想这一点：有如此之多的 lowerable objects 被包括在 G-Expressions 库中，肯定有办法进一步定义， define-gexp-compiler 宏是我们需要的
+
+define-gexp-compiler 的基本用法是，创建一个 procedure 它的参数是一个 lower record, host system, target system ，返回一个 derivation 或者 store item 在 %store-monad 的 monadic 里
+
+我们先尝试创建一个 lowerable object
+
+#+begin_src scheme
+  (use-modules (srfi srfi-9))
+
+  (define-record-type <greeting-file>
+    (greeting-file greeting)
+    greeting?
+    (greeting greeting-file-greeting))
+#+end_src
+
+现在使用 define-gexp-compiler 将 lower-object 编译成 store item 或者 derivation
+lower-object 就是为了正确的使用 gexp-compiler 的 object 的 procedure
+
+#+begin_src scheme
+  (use-modules (ice-9 i18n))
+
+  (define-gexp-compiler (greeting-file-compiler
+                         (greeting-file <greeting-file>)
+                         system target)
+    (lower-object
+     (let ((greeting (greeting-file-greeting greeting-file)))
+       (plain-file (string-append greeting "-greeting")
+                   (string-append (string-locale-titlecase greeting) ", world!")))))
+#+end_src
+
+#+begin_example
+$4 = #<<gexp-compiler> type: #<record-type <greeting-file>> lower: #<procedure 18a6d18 at <unknown port>:273:0 (greeting-file system target)> expand: #<procedure default-expander (thing obj output)>>
+#+end_example
+
+现在重写使用 <greeting-file> 的示例
+
+#+begin_src scheme
+  (define world-greeting-2-output
+    (build-derivation
+     (gexp->derivation "world-greeting-2"
+                       #~(begin
+                           (mkdir #$output)
+                           (symlink #$(greeting-file "hi")
+                                    (string-append #$output "/hi"))
+                           (symlink #$(greeting-file "hello")
+                                    (string-append #$output "/hello"))
+                           (symlink #$(greeting-file "greetings")
+                                    (string-append #$output "/greetings"))))))
+
+  (apply values
+         (map (lambda (file-path)
+                (let* ((path (string-append world-greeting-2-output
+                                            "/" file-path))
+                       (contents (call-with-input-file path get-string-all)))
+                  (list path contents)))
+              (scandir world-greeting-2-output
+                       (lambda (path)
+                         (not (or (string=? path ".")
+                                  (string=? path "..")))))))
+#+end_src
+
+#+begin_example
+$5 = ("/gnu/store/glwksy3nrbqs270c0pkq7npd8y4w3grr-world-greeting-2/greetings" "Greetings, world!")
+$6 = ("/gnu/store/glwksy3nrbqs270c0pkq7npd8y4w3grr-world-greeting-2/hello" "Hello, world!")
+$7 = ("/gnu/store/glwksy3nrbqs270c0pkq7npd8y4w3grr-world-greeting-2/hi" "Hi, world!")
+#+end_example
+
+这个例子可能不够复杂，你可能觉得不值得编写一个新的 gexp-compiler ，你可能注意到了这个输出
+
+#+begin_example
+$4 = #<<gexp-compiler>
+        type: #<record-type <greeting-file>>
+        lower: #<procedure 18a6d18 at <unknown port>:273:0 (greeting-file system target)>
+        expand: #<procedure default-expander (thing obj output)>>
+#+end_example
+
+type 和 lower 是显而易见的，但是 expand 是什么？ 如果你注意到 file-append ，你可能会意识到，由 gexp-compiler 生成的用于嵌入到 G-Expressions 中的文本并不一定是所生成的 derivation 的精确 output 路径。
+
+这里还有另一种方式编写 define-gexp-compiler 允许你同时指定 lowering procedure 编译成的 derivation 或者 store item ；以及 expanding procedure 扩展成 text
+
+首先创建一个新的 lowerable object ；这是一个构建 Guile package 和 expand 它的 module 目录的 record
+
+#+begin_src scheme
+  (define-record-type <module-directory>
+    (module-directory package)
+    module-directory?
+    (package module-directory-package))
+#+end_src
+
+现在同时定义一个 compiler 和 expander 为了 <module-directory> record
+
+#+begin_src scheme
+  (use-modules (gnu packages guile)
+               (guix packages)
+               (guix utils))
+
+  (define lookup-expander (@@ (guix gexp) lookup-expander))
+
+  (define-gexp-compiler module-directory-compiler <module-directory>
+    compiler => (lambda (obj system target)
+                  (let ((package (module-directory-package obj)))
+                    (lower-object package system #:target target)))
+    expander => (lambda (obj drv output)
+                  (let* ((package (module-directory-package obj))
+                         (expander (or (lookup-expander package)
+                                       (lookup-expander drv)))
+                         (out (expander package drv output))
+                         (guile (or (lookup-package-input package "guile")
+                                    guile-3.0))
+                         (version (version-major+minor
+                                   (package-version guile))))
+                    (string-append out "/share/guile/site/" version))))
+#+end_src
+
+#+begin_example
+$5 = #<<gexp-compiler> type: #<record-type <module-directory>> lower: #<procedure 1c5df68 at <unknown port>:435:16 (obj system target)> expand: #<procedure 1c5df78 at <unknown port>:438:16 (obj drv output)>>
+#+end_example
+
+让我们输出它
+
+#+begin_src scheme
+  (use-modules (gnu packages guile-xyz))
+
+  (define module-directory-output/guile-webutils
+    (build-derivation
+     (gexp->derivation "module-directory-output"
+                       #~(symlink #$(module-directory guile-webutils) #$output))))
+#+end_src
+
+#+begin_src scheme
+  (readlink module-directory-output/guile-webutils)
+#+end_src
+
+#+begin_example
+$6 = "/gnu/store/by79i9wm0igai3birq5scx1jdin0awx8-guile-webutils-0.1-1.d309d65/share/guile/site/3.0"
+#+end_example
+
+#+begin_src scheme
+  (scandir module-directory-output/guile-webutils)
+#+end_src
+
+#+begin_example
+$7 = ("." ".." "webutils")
+#+end_example
+
+#+begin_src scheme
+  (define module-directory-output/guile2.2-webutils
+    (build-derivation
+     (gexp->derivation "module-directory-output"
+                       #~(symlink #$(module-directory guile2.2-webutils) #$output))))
+#+end_src
+
+#+begin_src scheme
+  (readlink module-directory-output/guile2.2-webutils)
+#+end_src
+
+#+begin_example
+$8 = "/gnu/store/837rndx2v0pb1qmlwp2qcwsqh4kh79ik-guile2.2-webutils-0.1-1.d309d65/share/guile/site/2.2"
+#+end_example
+
+#+begin_src scheme
+  (scandir module-directory-output/guile2.2-webutils)
+#+end_src
+
+#+begin_example
+$9 = ("." ".." "webutils")
+#+end_example
+
+谁知道你为什么想做这件事,但确实有效!我们已经研究了为什么需要G表达式、它们的工作原理以及如何扩展它们,现在我们只有两个更先进的功能可供使用:跨平台构建支持和模块。
+
+** 导入外部模块
+
+* Function Programming
+函数式编程是 Alonzo Church 的思想实践，
+*** lambda ，是函数式编程的基本单元，一切进入 lambda 的变量都不再可变，所以相同的输入会得到相同的输出
+*** 高阶函数，接受函数用于改变功能的函数
+*** currying，能够返回已经传入部分参数的函数，可以逐步传入参数
+*** 惰性评估，仅仅在需要时才执行代码，而不是定义时执行
+**** 抽象控制结构，如果 condition 为 #f ，则 condition 与 body 永远不会评估
+**** 无限数据结构，由于需要才会被评估，无限的数据结构只在我们取出部分的时候评估取出的部分
+*** 顺序评估的方式
+**** continuation 同上 call-with-current-continuation
+**** 模式匹配，将部分分支拆分成定义，如果需要修改分支行为不用进入庞大的分支结构
+**** 闭包，在函数里定义的函数，同一个闭包的相同特点是都拥有同一个父函数

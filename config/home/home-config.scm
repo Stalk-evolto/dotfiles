@@ -131,33 +131,33 @@
   (specifications->packages
    (append
     (list
-     "emacs-telega"
-     "monero"
-     "electrum"
      "electron-cash"
-     "recutils"
-     "docker-cli"
+     "electrum"
+     "emacs-telega"
      "firefox"
      "font-adobe-source-han-sans:cn"
-     "font-wqy-microhei"
-     "font-gnu-unifont"
      "font-gnu-freefont"
+     "font-gnu-unifont"
+     "font-wqy-microhei"
      "fontconfig"
      "gimp"
+     "gnome-shell-extension-gsconnect"
+     "gnome-system-monitor"
      "gnupg"
      "go"
+     "graphviz"
      "jami"
      "kdenlive"
      "libreoffice"
      "mariadb"
+     "monero"
      "obs"
      "pinentry"
+     "recutils"
+     "rust"
      "virt-manager"
      "virt-viewer"
-     "vlc"
-     "rust"
-     "gnome-shell-extension-gsconnect"
-     "gnome-system-monitor")
+     "vlc")
     %emacs-base-packages
     %emacs-for-guix
     %emacs-for-c
