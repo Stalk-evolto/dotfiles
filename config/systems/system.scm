@@ -147,7 +147,7 @@
      ;;           (cache "/var/cache/guix/publish")
      ;;           (ttl 432000)))
 
-     (service update-git-mirror-service-type)
+     (service update-mirror-service-type)
      (service git-ssh-service-type
               `(("git" ,(local-file "/home/stalk/keys/qin_rixiang.pub")
                  ,(local-file "/home/stalk/keys/stalk-win.pub"))))

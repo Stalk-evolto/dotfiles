@@ -16,6 +16,7 @@
 
 (define-module (config services)
   #:use-module (guix gexp)
+  #:use-module (guix monads)
   #:use-module (gnu services)
   #:use-module (srfi srfi-1)
   #:use-module (ice-9 textual-ports)
@@ -28,3 +29,14 @@ targeting one of the types in LST."
      (inherit type)
      (extensions (append lst
                          (service-type-extensions type)))))
+
+(define (processes-return value)
+  (lambda ()
+    value))
+
+(define (processes-bind mvalue mproc)
+  (mproc (mvalue)))
+
+(define-monad %processes-monad
+  (bind processes-bind)
+  (return processes-return))
