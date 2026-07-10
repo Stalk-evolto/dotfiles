@@ -370,6 +370,469 @@ pause 将 display 追加进 lwp，拆解其过程
      #+end_src
 2. eval start 进入下一个 thunk，直到 eval 到其他 thunk 的 continuation 跳回对应的 thunk 继续执行.
 
+* Macro
+
+Macro 是用于处理代码的程序，可以通过定义 Macro 扩展 Lisp 语言。
+
+** Defining Macros
+
+*** define-syntax keyword transformer
+
+绑定语法转变器 transformer 到 keyword 。
+
+*** let-syntax ((keyword transformer) …) exp1 exp2 …
+
+局部绑定 transformer 到 keyword 类似 let 。
+
+*** letrec-syntax ((keyword transformer) …) exp1 exp2 …
+
+类似 letrec ，在局部绑定时局部变量可以互相引用
+
+#+begin_src scheme
+  (letrec-syntax ((my-or
+                   (syntax-rules ()
+                     ((my-or)
+                      #t)
+                     ((my-or exp)
+                      exp)
+                     ((my-or exp rest ...)
+                      (let ((t exp))
+                        (if t
+                            t
+                            (my-or rest ...)))))))
+    (my-or #f "rockaway beach"))
+#+end_src
+
+#+RESULTS:
+: rockaway beach
+
+** Syntax-rules Macros
+
+syntax-rules 是创建 macro 的一种简单形式，以 pattern-driven (模式匹配驱动) 匹配语法转变器。
+
+*** syntax-rules literals (pattern template) …
+  创建一个语法转变器,使用 pattern (匹配模式) 和 template (模板) 中包含的规则重写表达式。
+
+  一个 syntax-rules 由三个部分组成：
+  1. literals 如果输入的表达式是一个与 literal 相同的 identifier ，且两者均未绑定，则匹配。 literals 可以为空。
+     例如：
+     #+begin_src scheme
+       (define-syntax cond1
+         (syntax-rules (=> else)
+           ((cond1 test => fun)
+            (let ((exp test))
+              (if exp (fun exp) #f)))
+           ((cond1 else exp exp* ...)
+            (begin exp exp* ...))
+           ((cond1 test exp exp* ...)
+            (if test (begin exp exp* ...)))))
+
+       (define (square x) (* x x))
+     #+end_src
+
+     以下输入与 (cond1 test => fun) pattern 匹配
+     #+begin_example
+     (cond1 10 => square)
+     ⇒ 100
+     #+end_example
+     以下输入由于 => 被使用 let binding 值，此时的 => 不再是 unbound 不能与 literals 的 identifier 匹配； 有 binding 即是 symbol 可以被 (cond1 test exp exp* ...) 的 pattern variable 匹配并捕获
+     #+begin_example
+     (let ((=> #t))
+       (cond1 10 => square))
+     ⇒ #<procedure square (x)>
+     #+end_example
+
+  2. patterns
+     与 match 的 patterns 类似，输入形式与 patterns 相同的部分会触发匹配的 templates
+
+  3. templates
+     触发 patterns 时，将 patterns 替换成 templates
+
+虽然 literals 是未绑定的,但通常它们必然允许它们被模块 import, export 和 rename。
+以下为一些辅助语法定义
+
+|------+------------------------------------------------------------------------------------------------------|
+| else | 一个普通的 literals ，在 cond 和 case 中用来指定没有列出的情况，所以预先占用防止影响其行为                      |
+|------+------------------------------------------------------------------------------------------------------|
+| =>   | 一个普通的 literals ，在 cond 和 case 中用来将 TEST 的结果作为参数传递给 EXPRESSION ，所以预先占用防止影响其行为 |
+|------+------------------------------------------------------------------------------------------------------|
+| _    | 在 syntax-rules 中是通配符 (匹配任何值的变量)，在 syntax-case 中是一个普通的 literals ，预先占用防止影响其行为  |
+|------+------------------------------------------------------------------------------------------------------|
+| ...  | 在 syntax-case 中表示后续的任意数量的变量都会打包成 list 储存到 ... 前一个变量中，预先占用防止影响其行为          |
+|------+------------------------------------------------------------------------------------------------------|
+
+辅助语法定义从不匹配，就像被这样定义
+
+#+begin_src scheme
+(define-syntax else (syntax-rules ()))
+#+end_src
+
+如果 pattern 不是一个 list, vector 或者 identifer ，那么它通过g equal? 匹配一个 literal 。
+
+#+begin_src scheme
+  (define-syntax define-matcher-macro
+    (syntax-rules ()
+      ((_ name lit)
+       (define-syntax name
+         (syntax-rules ()
+           ((_ lit) #t)
+           ((_ else) #f))))))
+
+  (define-matcher-macro is-literal-foo? "foo")
+#+end_src
+
+由于 _ 和 else 从不匹配，在此只是一个 literal ，相当于匹配一个没有被其他 pattern 匹配的任意值
+#+begin_example
+(is-literal-foo? "foo")
+=> #t
+
+(is-literal-foo? "bar")
+=> #f
+#+end_example
+
+下面例子匹配相当于 (equal? '('is-literal-foo? "foo") '('is-literal-foo? 'foo)) 结果为 #f ，最终被 (_ else) 保底 pattern 捕获
+因为匹配是在 expansion-time 时发生，而不是 run-time ， expansion-time 时 'foo 还未获得值
+#+begin_example
+(let ((foo "foo"))
+  (is-literal-foo? foo))
+=> #f
+#+end_example
+
+syntax-rules 始终以 (macro . args) 的形式使用,而 macro 将始终作为 symbol 。相应地 syntax-rules pattern 必须是 list (proper or improper) ，而该 list 中的第一个 pattern 必须是 identifer 。顺便提一下，它可以是任何 identifer 不必是 macro 的名称。因此以下三个是等价的:
+
+#+begin_src scheme
+  (define-syntax when
+    (syntax-rules ()
+      ((when c e ...)
+       (if c (begin e ...)))))
+
+  (define-syntax when
+    (syntax-rules ()
+      ((_ c e ...)
+       (if c (begin e ...)))))
+
+  (define-syntax when
+    (syntax-rules ()
+      ((something-else-entirely c e ...)
+       (if c (begin e ...)))))
+#+end_src
+
+为明确起见,请使用前两种变体之一。另外注意，由于第一个 pattern variable 始终与 macro 本身匹配(例如 when)，因此它实际上在 template 中会 unbound 。
+
+pattern variable 只需要满足相对位置关系即可匹配， literal 则需要字符完全相同才可以匹配。
+
+*** Hygiene
+
+macro 定义里的变量都是在 macro 定义里的局部绑定，当 macro 扩展成 expression 后， expression 的变量也取决于 expression 的作用域，这种互不干扰的特性被称为 Hygiene
+
+*** Shorthands
+
+只有一个 (pattern . template) 的 syntax-rules 有以下缩写
+
+- define-syntax-rule (keyword . pattern) [docstring] template
+
+  定义 keyword 为一个 pattern . template 扩展的 syntax-rules ，下面两个定义是等价的
+
+  #+begin_src scheme
+    (define-syntax-rule (when c e ...)
+      (if c (begin e ...)))
+
+    (define-syntax when
+      (syntax-rules ()
+        ((when c e ...)
+         (if c (begin e ...)))))
+  #+end_src
+
+** syntax-case
+
+*** syntax-case syntax literals (pattern [guard] exp) …
+
+将 syntax object 与给定的 patterns 按顺序匹配。如果 pattern 匹配，返回评估关联的 exp 的结果。
+
+以下定义是等价的
+
+#+begin_src scheme
+  (define-syntax when
+    (syntax-rules ()
+      ((_ test e e* ...)
+       (if test (begin e e* ...)))))
+
+  (define-syntax when
+    (lambda (x)
+      (syntax-case x ()
+        ((_ test e e* ...)
+         #'(if test (begin e e* ...))))))
+#+end_src
+
+syntax-case 定义与 syntax-rules 相似，同样明显地存在一些差异。 syntax-case 定义包含在一个只有一个 argument 的 lambda procedure中；该 argument 被传递给 syntax-case 调用;以及 macro 的 "return value" 具有 #' 前缀。
+所有这些差异都源于 syntax-case 不定义语法转变器 (transformer)本体。 相反， syntax-case 表达式提供了一种解构 syntax object 以及重构 syntax object 输出的方法。
+所以 lambda 包装只是一个简单实现的细节暴露, 语法转变器只是将 syntax 转换为 syntax 的函数。不必惊讶，因为我们已经将 macro 描述为 “编写程序的程序”。 syntax-case 是一种简单的分开和组合程序文本，以及需要包装到一个 procedure 的有效语法转变器。
+
+*** syntax form
+
+#+begin_example
+(syntax (foo bar baz))
+=> #<some representation of that syntax>
+#+end_example
+
+#+begin_src scheme
+  (define-syntax add1
+    (lambda (x)
+      (syntax-case x ()
+        ((_ exp)
+         (syntax (+ exp 1))))))
+#+end_src
+从此 syntax 在 macro-heavy 的代码中经常出现,它有一个特别的可读的 macro: #'。 #'foo 被可读的转变为 (syntax foo) 就像 'foo 被转变为 (quote foo)。
+
+#+begin_src scheme
+  (define-syntax add1
+    (lambda (x)
+      (syntax-case x ()
+        ((_ exp)
+         #'(+ exp 1)))))
+#+end_src
+
+syntax-rules 实际上是 syntax-case 的包装
+
+#+begin_src scheme
+  (define-syntax syntax-rules
+    (lambda (x)
+      (syntax-case x ()
+        ((_ (k ...) ((keyword . pattern) template) ...)
+         #'(lambda (x)
+             (syntax-case x (k ...)
+               ((dummy . pattern) #'template)
+               ...))))))
+#+end_src
+
+** Why syntax-case?
+
+*** identifier? syntax-object
+
+用于检查 syntax-object 是否是 identifier ，如果不是返回 #f
+
+#+begin_src scheme
+  ;; relying on previous add1 definition
+  (define-syntax add1!
+    (lambda (x)
+      (syntax-case x ()
+        ((_ var) (identifier? #'var)
+         #'(set! var (add1 var))))))
+
+  (define foo 0)
+  (add1! foo)
+#+end_src
+
+由于 foo 是 define 定义的 identifier ，可以正常扩展； 字符串字面量不是 identifier ，由于没有其它匹配项能够匹配，报错
+#+begin_example
+foo
+=> 1
+
+(add1! "not-an-identifier")
+=> While compiling expression:
+   Syntax error:
+   unknown file:118:0: source expression failed to match any pattern in form (add1! "not-an-identifier")
+#+end_example
+
+*** Unhygiene
+由于 macro 的 Hygiene 性质， 扩展成 expression 后，无法在 expression 处使用 macro 内的变量，那如何打破 Hygiene 呢?
+例如，我们想要实现 aif 有以下用法:
+
+#+begin_src scheme
+  (define (foo) "Hello")
+
+  (aif (foo) (display it) (display "none"))
+  -\ Hello
+
+  (aif #f (display it) (display "none"))
+  -\ none
+#+end_src
+
+先看一个不能正常工作的定义
+#+begin_src scheme
+  ;; doesn't work
+  (define-syntax aif
+    (lambda (x)
+      (syntax-case x ()
+        ((_ test then else)
+         #'(let ((it test))
+             (if it then else))))))
+#+end_src
+不出所料，报错 it 未绑定
+#+begin_example
+(aif "test" (display "true") (display "none"))
+-\ true
+
+(aif "test" (display it) (display "none"))
+-\ ;;; <stdin>:210:14: warning: possibly unbound variable `it'
+   ice-9/boot-9.scm:1705:22: In procedure raise-exception:
+   Unbound variable: it
+#+end_example
+
+但是我们可以通过 datum->syntax 明确声明一个绑定
+
+**** datum->syntax template-id datum [#:source=#f]
+
+创建一个包装了 datum 的 syntax object，在 identifier template-id 对应的词法上下文中。如果 template-id 为 false，则 datam 将没有词法上下文信息。
+syntax object 有关联的源位置 (source location) 。以三维元素 vector 表示 filename, line, column 。通常此位置最终由 read-syntax 提供。
+- syntax object 通过 source 生成的， syntax object 将具有 source 的源位置。
+- source 为储存源位置的三维 vector，该 vector 将成为所生成的 syntax object 的源位置。
+- source 是 source properties alist ,则它们将被解析并设置为生成的 syntax object 的源位置。
+- source 为假，则从 (source-properties datum) 查找 source properties。
+
+**** syntax->datum syntax-object
+
+datum->syntax 的逆过程，用于从 syntax object 中剥离元数据，将其内容返回为一个原始的 scheme datum
+
+那么我们可以使用 (datum->syntax x 'it) 创建一个 syntax object
+
+#+begin_src scheme
+  ;; doesn't work either
+  (define-syntax aif
+    (lambda (x)
+      (syntax-case x ()
+        ((_ test then else)
+         (let ((it (datum->syntax x 'it)))
+           #'(let ((it test))
+               (if it then else)))))))
+#+end_src
+这里的的 x 是整个通过 macro transformer 的 procedure 的 expression，这样可以将 it 声明到 expression 的上下文中
+但是，这仍然是不能正常工作的
+
+#+begin_example
+(aif "test" (display "true") (display "none"))
+-\ true
+
+(aif "test" (display it) (display "none"))
+-\ ;;; <stdin>:210:14: warning: possibly unbound variable `it'
+   ice-9/boot-9.scm:1705:22: In procedure raise-exception:
+   Unbound variable: it
+#+end_example
+
+这不能工作的原因是实际上有两个环境在这生效
+- syntax-case 绑定的 pattern variables
+- 普通 scheme 绑定的 lexical variables
+
+外层 let 建立一个 lexical variables 环境的绑定，但是内部 let 是在一个 syntax 内部，这里只允许 pattern variables 替换。
+这里我们需要使用 syntax-case 在 pattern variable enviroment 声明一个关于 lexical enviroment 的片段
+
+#+begin_src scheme
+  ;; works, but is obtuse
+  (define-syntax aif
+    (lambda (x)
+      (syntax-case x ()
+        ((_ test then else)
+         ;; invoking syntax-case on the generated
+         ;; syntax object to expose it to `syntax'
+         (syntax-case (datum->syntax x 'it) ()
+           (it
+            #'(let ((it test))
+                (if it then else))))))))
+#+end_src
+
+#+begin_example
+(aif "test" (display "true") (display "none"))
+-\ true
+
+(aif "test" (display it) (display "none"))
+-\ test
+#+end_example
+
+这能够正常工作了，但是两层 syntax-case 嵌套略显冗余，于是 with-syntax 出现了
+
+*** with-syntax ((pat val) …) exp …
+
+在 exp 局部上下文绑定 patterns (pat) 到对应的 valuse (val)
+
+上述 aif 定义等价于
+#+begin_src scheme
+  ;; better
+  (define-syntax aif
+    (lambda (x)
+      (syntax-case x ()
+        ((_ test then else)
+         (with-syntax ((it (datum->syntax x 'it)))
+           #'(let ((it test))
+               (if it then else)))))))
+#+end_src
+
+可以看出 with-syntax 是由 syntax-case 定义的， with-syntax 就像对 pattern 的 let 。
+
+*** quasisyntax unsyntax unsyntax-splicing
+
+与之类似的，普通 scheme 使用外部绑定的方法还有 quasiquote unquote unquote-splicing
+同样的，也可以通过 syntax-case 定义出 quasisyntax unsyntax unsyntax-splicing
+
+| #`exp  | (quasisyntax exp)       | `data  | (quasiquote data)       |
+|--------+-------------------------+--------+-------------------------|
+| #,obj  | (unsyntax obj)          | ,expr  | (unquote expr)          |
+|--------+-------------------------+--------+-------------------------|
+| #,@lst | (unsyntax-splicing lst) | ,@expr | (unquote-splicing expr) |
+
+#+begin_src scheme
+  (define-syntax display-compile-timestamp
+    (lambda (x)
+      (syntax-case x ()
+        ((_)
+         #`(begin
+             (display "The compile timestamp was: ")
+             (display #,(current-time))
+             (newline))))))
+#+end_src
+这就像
+#+begin_src scheme
+  (define (display-compile-timestamp)
+    (eval
+     `(begin
+        (display "The compile timestamp was: ")
+        (display ,(current-time))
+        (newline))
+     (interaction-environment)))
+#+end_src
+二者输出相同，都是
+#+begin_example
+(display-compile-timestamp)
+-\ The compile timestamp was: 1782769227
+#+end_example
+
+*** with-ellipsis ellipsis body …
+
+ellipsis 必须是一个 identifier 。 在一个特殊的 lexical environment 评估 body ，这样所有在 body 中的 macro 的 patterns 和 templates 将使用 ellipsis 作为 ellipsis 标识符而不是使用三个点 (...)。
+
+在 syntax-rules Macros 中，我们知道有一些由 R6RS 和 R7RS 定义的辅助语法定义
+
+|------+------------------------------------------------------------------------------------------------------|
+| else | 一个普通的 literals ，在 cond 和 case 中用来指定没有列出的情况，所以预先占用防止影响其行为                      |
+|------+------------------------------------------------------------------------------------------------------|
+| =>   | 一个普通的 literals ，在 cond 和 case 中用来将 TEST 的结果作为参数传递给 EXPRESSION ，所以预先占用防止影响其行为 |
+|------+------------------------------------------------------------------------------------------------------|
+| _    | 在 syntax-rules 中是通配符 (匹配任何值的变量)，在 syntax-case 中是一个普通的 literals ，预先占用防止影响其行为  |
+|------+------------------------------------------------------------------------------------------------------|
+| ...  | 在 syntax-case 中表示后续的任意数量的变量都会打包成 list 储存到 ... 前一个变量中，预先占用防止影响其行为          |
+|------+------------------------------------------------------------------------------------------------------|
+
+其中 else => _ 在 syntax-case 中都是可替换的，但是 ... 在 syntax-case 中有特殊含义，如果需要替换，可以使用 with-ellipsis
+
+#+begin_src scheme
+  (define-syntax define-quotation-macros
+    (lambda (x)
+      (syntax-case x ()
+        ((_ (macro-name head-symbol) ...)
+         #'(begin (define-syntax macro-name
+                    (lambda (x)
+                      (with-ellipsis :::
+                                     (syntax-case x ()
+                                       ((_ x :::)
+                                        #'(quote (head-symbol x :::)))))))
+                  ...)))))
+#+end_src
+
+#+begin_example
+(define-quotation-macros (quote-a a) (quote-b b) (quote-c c))
+(quote-a 1 2 3)
+=> (a 1 2 3)
+#+end_example
+
 * Fibers
 guile 并发编程的一种方式， Fiber 是 Fibers 的最小单元， 可以通过 spawn-fiber 创建分支 Fibers ，最终通过 run-fibers 统一启动。
 
@@ -578,9 +1041,51 @@ mval 作为输入依次执行 mproc (monadic procedures)
          (remove-a str2))))
 #+end_src
 
-** mbegin monad mexp …
-
+** mbegin monad mexp
 类似 begin 按顺序执行 mexp ，结果在 monadic 中。
+
+** lift
+
+先看定义
+
+#+begin_src scheme
+  (define-syntax define-lift
+    (syntax-rules ()
+      ((_ liftn (args ...))
+       (define-syntax liftn
+         (lambda (s)
+           "Lift PROC to MONAD---i.e., return a monadic function in MONAD."
+           (syntax-case s ()
+             ((liftn proc monad)
+              ;; Inline the result of lifting PROC, such that 'return' can in
+              ;; turn be open-coded.
+              #'(lambda (args ...)
+                  (with-monad monad
+                    (return (proc args ...)))))
+             (id
+              (identifier? #'id)
+              ;; Slow path: Return a closure-returning procedure (we don't
+              ;; guarantee (eq? LIFTN LIFTN), but that's fine.)
+              #'(lambda (proc monad)
+                  (lambda (args ...)
+                    (with-monad monad
+                      (return (proc args ...))))))))))))
+#+end_src
+
+可以看出 define-lift 定义了 liftn 这个 symbol ， liftn 可以将一个 proc 变成返回相应 monad 的 monadic 的 proc.
+
+例如
+
+#+begin_src scheme
+  (define-lift lift0 ())
+  ((lift0 (lambda () (+ 1 1)) %maybe-monad))
+#+end_src
+
+#+begin_example
+$1 = #<<maybe> is?: #t value: 2>
+#+end_example
+
+lift 是将普通 procedure 转变成 monad 的方法
 
 *** mwhen condition mexp0 mexp* …
 *** munless condition mexp0 mexp* …
