@@ -50,7 +50,6 @@
   #:use-module (gnu services databases)
   #:use-module (gnu services desktop)
   #:use-module (gnu services dns)
-  #:use-module (gnu services dns)
   #:use-module (gnu services docker)
   #:use-module (gnu services getmail)
   #:use-module (gnu services guix)
@@ -77,8 +76,8 @@
 (operating-system
   (inherit %base-system)
   (kernel linux)
-  (initrd microcode-initrd)
   (firmware (list linux-firmware))
+  (initrd microcode-initrd)
   (locale "en_US.utf8")
   (timezone "Asia/Shanghai")
   (keyboard-layout (keyboard-layout "us"))
@@ -99,7 +98,10 @@
   ;; under their own account: use 'guix search KEYWORD' to search
   ;; for packages and 'guix install PACKAGE' to install a package.
   (packages (append (map specification->package
-                         '("ibus"
+                         '("emacs"
+			   "emacs-exwm"
+			   "emacs-desktop-environment"
+			   "ibus"
                            "ibus-rime"
                            "ibus-libpinyin"
                            "dconf"
@@ -138,8 +140,7 @@
                (subsystems
                 `(("sftp" ,(file-append openssh "/libexec/sftp-server"))))
                (authorized-keys
-                `(("stalk" ,(local-file "/home/stalk/keys/stalk.pub"))
-                  ("root" ,(local-file "/root/keys/stalk.pub"))))))
+                `(("stalk" ,(local-file "/home/stalk/keys/stalk.pub"))))))
      ;; (service guix-publish-service-type
      ;;          (guix-publish-configuration
      ;;           (port 80)
@@ -227,8 +228,25 @@ keys = transient-tg-mtproxy"))))
               (tor-configuration
                (tor tor-latest)
                (socks-socket-type 'tcp)
-               (config-file (local-file
-                             "/etc/tor/torrc"))
+	       (config-file (plain-file "torrc"
+                                           "\
+ClientOnly 1
+ClientUseIPv4 1
+ClientUseIPv6 1
+ClientAutoIPv6ORPort 1
+HTTPTunnelPort 8118
+SocksPort 127.0.0.1:9050
+
+UseBridges 1
+
+Bridge webtunnel [2001:db8:1c6b:27b9:a0a4:aa4:fa98:2734]:443 CE95A839CADA1ED38508B099C6C610CBB0EA7F81 url=https://cdn-37.triplebit.dev/oxaiBaa6ierohquu ver=0.0.2
+Bridge webtunnel [2001:db8:db93:b227:b085:2fb2:6699:3758]:443 23710B81797F7F158D0BADE5ABF8937F9FA8A1E6 url=https://0016100.xyz/o0uXxHSvpyHlz6bhmT9bx90U ver=0.0.4
+Bridge webtunnel [2001:db8:47be:2940:b47f:d38d:f1b6:7232]:443 ADCF1A11CAE3EA058082C50E26262CA8AE825955 url=https://us02-lax.beijing.st/ohmygodohmygodamerikawow ver=0.0.4
+Bridge webtunnel [2001:db8:4d82:98ef:ce79:2040:5455:2e8e]:443 DAFBC7A6696351433146631CC836FD6ED64AEC90 url=https://151.242.242.194/scared-factor-headstone ver=0.0.4
+Bridge webtunnel [2001:db8:7ed3:a85b:fd0f:d2a8:ebbe:a588]:443 A82B7060501179D6131AF6BCCD5DF4EA5F0A0D59 url=https://kochenjessler.de/RhV075MQmlMKQXZ8Bei5AOeQ ver=0.0.3
+Bridge webtunnel [2001:db8:8e11:37cf:5167:5fce:4650:c2f8]:443 5AE50E81167318FE0A152D4F050C839DB42AB9B8 url=https://signaling.privacy-vbox.de/s6CjTuyWZOWe9Fbhl7ThQ5Lb ver=0.0.2
+"))
+
                (hidden-services
                 (list (tor-onion-service-configuration
                        (name "monero-service")
@@ -306,7 +324,21 @@ guest only = yes\n"))))
     ;; This is the default list of services
     ;; we are appending to.
     (modify-services %desktop-services
-      (guix-service-type config => (guix-configuration
-                                    (inherit config)
-                                    (discover? #t)
-                                    (http-proxy "http://localhost:8118")))))))
+      (guix-service-type
+       config =>
+       (guix-configuration
+        (inherit config)
+        (discover? #t)
+        (http-proxy "http://localhost:8118")
+        (substitute-urls
+         (append (list "https://substitutes.nonguix.org")
+                 %default-substitute-urls))
+        (authorized-keys
+         (append (list (plain-file "signing-key.pub" "\
+(public-key
+ (ecc
+  (curve Ed25519)
+  (q #C1FD53E5D4CE971933EC50C9F307AE2171A2D3B52C804642A7A35F84F3A4EA98#)
+  )
+ )"))
+                 %default-authorized-guix-keys))))))))

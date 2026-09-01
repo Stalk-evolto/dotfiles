@@ -57,9 +57,6 @@
                                            (openssh-configuration
                                             (permit-root-login #t)
                                             (authorized-keys
-                                             `(("root"
-                                                ,(local-file
-                                                  "/root/.ssh/id_ed25519_childhurd.pub"))
-                                               ("stalk"
+                                             `(("stalk"
                                                 ,(local-file
                                                   "/home/stalk/.ssh/id_ed25519.pub"))))))))))

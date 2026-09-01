@@ -47,7 +47,9 @@
 
     (packages
      (append
-      (list emacs emacs-eclip git)
+      (list emacs
+	    emacs-eclip
+	    git)
       (operating-system-packages installation-os)))
 
     (services

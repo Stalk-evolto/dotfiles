@@ -38,17 +38,17 @@
             python-gguf-latest))
 
 (define-public llama-cpp-latest
-  (let ((tag "b7375"))
+  (let ((tag "7375"))
     (package
      (inherit llama-cpp)
       (name "llama-cpp-latest")
-      (version tag)
+      (version (string-append "0.0.0-" tag))
       (source
        (origin
          (method git-fetch)
          (uri (git-reference
                (url "https://github.com/ggml-org/llama.cpp")
-               (commit tag)))
+               (commit (string-append "b" tag))))
          (file-name (git-file-name name tag))
          (sha256
           (base32 "1i62w6fbc9id5v925fsayb1n57kz3mi9j8kvms40z8lxdyng261m"))))

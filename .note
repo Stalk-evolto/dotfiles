@@ -1,3 +1,7 @@
+# -*- mode: org; coding: utf-8; -*-
+
+#+TITLE: Note for Guile scheme and Guix
+
 * Scheme Procedure: call/cc proc
 
 call/cc 是 call-with-current-continuation 的缩写函数
@@ -2092,3 +2096,158 @@ $9 = ("." ".." "webutils")
 **** continuation 同上 call-with-current-continuation
 **** 模式匹配，将部分分支拆分成定义，如果需要修改分支行为不用进入庞大的分支结构
 **** 闭包，在函数里定义的函数，同一个闭包的相同特点是都拥有同一个父函数
+
+* Foreign Function Interface
+
+有时候你需要使用 C 或者 Rust 或者其他不是 scheme 语言的动态链接库，而现在的 Guile Reference 3.0 里只介绍了新式写法，而一些 Guile Scheme 项目仍然使用着 guile 2.0 旧式写法，例如 guile-git, shepherd 等。
+
+** 将 libc 转变成 scheme procedure 的写法
+
+*** guile 2.0 的 Foreign Function Interface 写法
+#+begin_src scheme
+  (define (libc->procedure return name params)
+    (catch #t
+      (lambda ()
+        (let ((ptr (dynamic-func name (dynamic-link))))
+          (pointer->procedure return ptr params)))
+      (lambda args
+        (lambda _
+          (throw 'system-error name  "~A" (list (strerror ENOSYS))
+                 (list ENOSYS))))))
+#+end_src
+*** guile 3.0 的等价写法
+#+begin_src scheme
+  (use-modules (system foreign-library))
+
+  (define (libc->procedure return name params)
+    (catch #t
+      (lambda ()
+        (let ((ptr (foreign-library-pointer (load-foreign-library) name)))
+          (pointer->procedure return ptr params)))
+      (lambda args
+        (lambda _
+          (throw 'system-error name  "~A" (list (strerror ENOSYS))
+                 (list ENOSYS))))))
+#+end_src
+*** guile 3.0 封装的 foreign-library-function 的等价写法
+#+begin_src scheme
+  (use-modules (system foreign-library))
+
+  (define (libc->procedure return name params)
+    (catch #t
+      (lambda ()
+        (foreign-library-function (load-foreign-library)
+                                  name
+                                  #:return-type return
+                                  #:arg-types params))
+      (lambda args
+        (lambda _
+          (throw 'system-error name  "~A" (list (strerror ENOSYS))
+                 (list ENOSYS))))))
+#+end_src
+*** guile 3.0 封装的 with-exception-handler 和 raise-exception 的等价写法
+#+begin_src scheme
+  (use-modules (system foreign-library))
+
+  (define (libc->procedure return name params)
+    (with-exception-handler
+        (lambda (exception)
+          (lambda _
+            (raise-exception
+             (make-exception-from-throw 'system-error
+                                        '(name "~A" (list (strerror ENOSYS)) (list ENOSYS))))))
+      (lambda ()
+        (foreign-library-function (load-foreign-library)
+                                  name
+                                  #:return-type return
+                                  #:arg-types params))
+      #:unwind? #t))
+#+end_src
+
+** 回归测试验证
+
+为了验证以上例子，可以写一个测试用例检验其效果
+#+begin_src scheme
+  (use-modules (system foreign)
+               (system foreign-library)
+               (srfi srfi-1)
+               (srfi srfi-64))
+
+  (define (libc->procedure/guile2.0 return name params)
+    (catch #t
+      (lambda ()
+        (let ((ptr (dynamic-func name (dynamic-link))))
+          (pointer->procedure return ptr params)))
+      (lambda args
+        (lambda _
+          (throw 'system-error name  "~A" (list (strerror ENOSYS))
+                 (list ENOSYS))))))
+
+  (define (libc->procedure/guile3.0 return name params)
+    (catch #t
+      (lambda ()
+        (let ((ptr (foreign-library-pointer (load-foreign-library) name)))
+          (pointer->procedure return ptr params)))
+      (lambda args
+        (lambda _
+          (throw 'system-error name  "~A" (list (strerror ENOSYS))
+                 (list ENOSYS))))))
+
+  (define (libc->procedure/guile-current return name params)
+    (catch #t
+      (lambda ()
+        (foreign-library-function (load-foreign-library)
+                                  name
+                                  #:return-type return
+                                  #:arg-types params))
+      (lambda args
+        (lambda _
+          (throw 'system-error name  "~A" (list (strerror ENOSYS))
+                 (list ENOSYS))))))
+
+  (define (libc->procedure return name params)
+    (with-exception-handler
+        (lambda (exception)
+          (lambda _
+            (raise-exception
+             (make-exception-from-throw 'system-error
+                                        '(name "~A" (list (strerror ENOSYS)) (list ENOSYS))))))
+      (lambda ()
+        (foreign-library-function (load-foreign-library)
+                                  name
+                                  #:return-type return
+                                  #:arg-types params))
+      #:unwind? #t))
+
+  (define %foreign-function-interface
+    (list libc->procedure/guile2.0
+          libc->procedure/guile3.0
+          libc->procedure/guile-current
+          libc->procedure))
+
+  (define %libc-functions-info
+    (list (list int "abs" (list int))
+          (list int "isalpha" (list int))
+          (list int "isdigit" (list int))
+          (list int "isupper" (list int))
+          (list int "islower" (list int))))
+
+  (define (all-equal? lst)
+    (or (null? lst)
+        (fold (lambda (x acc)
+                (and acc (equal? x (car lst))))
+              #t
+              (cdr lst))))
+
+  (test-begin "Foreign Function Interface")
+
+  (test-assert "return equal"
+    (every identity
+           (let ((input (random 127)))
+             (map (lambda (info)
+                    (all-equal? (map (lambda (ffi) ((apply ffi info) input))
+                                     %foreign-function-interface)))
+                  %libc-functions-info))))
+
+  (test-end "Foreign Function Interface")
+#+end_src

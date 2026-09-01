@@ -1,6 +1,7 @@
 (define-module (config monads)
   #:use-module (guix monads)
   #:use-module (srfi srfi-9)
+  #:use-module (ice-9 match)
   #:export (<maybe>
             make-maybe
             maybe?
@@ -26,7 +27,8 @@
 
             %either-monad
             either-bind
-            try-either))
+            try-either
+            with-either-exception-handler))
 
 (define-record-type <maybe>
   (make-maybe is? value)
@@ -64,10 +66,20 @@
 (define (right value)
   (make-either 'right value))
 
+(define-syntax with-either-exception-handler
+  (lambda (s)
+    (syntax-case s ()
+        ((_ handler thunk)
+         #'(with-exception-handler
+               (lambda (exception)
+                 (left (handler exception)))
+             thunk
+           #:unwind? #t)))))
+
 (define (either-bind either proc)
-  (case (either-is? either)
-    ((right) (proc (either-value either)))
-    ((left) either)))
+  (match either
+    (($ <either> 'right value) (proc value))
+    (($ <either> 'left value) either)))
 
 (define-monad %either-monad
   (bind either-bind)

@@ -23,7 +23,7 @@
   #:use-module (gnu packages compression)
   #:use-module (gnu packages crypto)
   #:use-module (gnu packages dbm)
-  #:use-module (gnu packages flex)
+  #:use-module (gnu packages compiler-tools)
   #:use-module (gnu packages onc-rpc)
   #:use-module (gnu packages pcre)
   #:use-module (gnu packages perl)

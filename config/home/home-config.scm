@@ -47,16 +47,13 @@
 (define %emacs-base-packages
   (list "aspell"
         "aspell-dict-en"
-        "emacs"
-        "emacs-eclip"
+	"emacs"
         "emacs-debbugs"
-        "emacs-ellama"
         "git"
         "ripgrep"))
 
 (define %emacs-for-guix
-  (list "emacs-guix"
-        "emacs-geiser"
+  (list "emacs-geiser"
         "emacs-geiser-guile"
 	"emacs-paredit"
         "guile"
@@ -76,7 +73,6 @@
 
 (define %emacs-for-python
   (list "python-wrapper"
-        "uv"
 	"python-lsp-server"
         "python-black"
         "python-flake8"
@@ -97,30 +93,13 @@
         "pinentry"
         "rubber"
         "texi2html"
-        "texinfo"
-        "texlive-chinese-jfm"
-        "texlive-collection-langchinese"
-        "texlive-digestif"
-        "texlive-lshort-chinese"
-        "texlive-noto"
-        "texlive-notoccite"
-        "texlive-notomath"
-        "texlive-pdftex"
-        "texlive-scheme-basic"
-        "texlive-scripts"
-        "texlive-texinfo"
-        "texlive-xetex"
-        "texlive-xetex-bin"
-        "texlive-zhspacing"
-        "texlive-zhspacing:doc"
-        ))
+        "texinfo"))
 
 (define %llms
   (list "llama-cpp-latest"))
 
 (define %hack-tools
   (list "nmap"
-        "hydra"
         "wireshark"
         "tcpdump"))
 
@@ -133,7 +112,6 @@
     (list
      "electron-cash"
      "electrum"
-     "emacs-telega"
      "firefox"
      "font-adobe-source-han-sans:cn"
      "font-gnu-freefont"
@@ -141,22 +119,16 @@
      "font-wqy-microhei"
      "fontconfig"
      "gimp"
-     "gnome-shell-extension-gsconnect"
-     "gnome-system-monitor"
      "gnupg"
-     "go"
      "graphviz"
      "jami"
      "kdenlive"
      "libreoffice"
-     "mariadb"
      "monero"
      "obs"
      "pinentry"
      "recutils"
-     "rust"
      "virt-manager"
-     "virt-viewer"
      "vlc")
     %emacs-base-packages
     %emacs-for-guix
@@ -185,10 +157,7 @@
                          ("e" . "emacsclient -t")
                          ("ec" . "emacsclient -c")
                          ("update-home" . "guix home reconfigure -L $HOME/dotfiles $HOME/dotfiles/config/home/home-config.scm")))
-              (bashrc (list (plain-file "bashrc" "\
-GUIX_PROFILE=$HOME/.guix-profile
-. $GUIX_PROFILE/etc/profile
-")))
+              (bashrc (list (local-file "../../files/.bashrc" "bashrc")))
               (bash-profile (list (local-file "../../files/.bash_profile"
                                               "bash_profile")))
               (environment-variables
@@ -239,8 +208,15 @@ GUIX_PROFILE=$HOME/.guix-profile
                       (forward-agent? #t)
                       (identity-file "/home/stalk/.ssh/id_ed25519"))
                      (openssh-host
-                      (name "windows")
+                      (name "debian")
                       (host-name "192.168.100.132")
+                      (user "test")
+                      (port 22)
+                      (forward-agent? #t)
+                      (identity-file "/home/stalk/.ssh/test_ed25519"))
+                     (openssh-host
+                      (name "windows")
+                      (host-name "192.168.100.177")
                       (user "Link")
                       (port 22)
                       (forward-agent? #t)

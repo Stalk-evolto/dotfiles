@@ -116,7 +116,7 @@
      (method git-fetch)
      (uri (git-reference
            (url "git://localhost/torsocks.git")
-           (commit version)))
+           (commit (string-append "v" version))))
      (file-name (git-file-name name version))
      (sha256
       (base32 "00y2541mk833lqz0p3bvaq1aywknbgsh6r5dgnksrk6zvzll6vms"))))
@@ -139,7 +139,7 @@
   (package
    (inherit go-gitlab-torproject-org-tpo-anti-censorship-pluggable-transports-webtunnel)
    (name "webtunnel")
-   (version "0.0.4")
+   (version "0.0.5")
    (source
     (origin
      (method git-fetch)
@@ -148,7 +148,7 @@
            (commit (string-append "v" version))))
      (file-name (git-file-name name version))
      (sha256
-      (base32 "07l9i361n0kglcda86gl4m0iciy8qygzgavgbknxf33fzkdslifk"))))
+      (base32 "1kq2y1sbkjxqjjkb290yl7lx9f4iq43sq5avg2ziq482i68fbmgm"))))
    (arguments
     (list
      #:import-path "gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/webtunnel"
