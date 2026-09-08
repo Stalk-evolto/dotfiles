@@ -109,7 +109,8 @@
                            "guile"
                            "guile-git"
                            "guile-bytestructures"
-                           "libgit2"))
+                           "libgit2"
+                           "shepherd"))
                     %base-packages))
 
   ;; Below is the list of system services.  To search for available

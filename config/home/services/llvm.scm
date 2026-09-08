@@ -44,7 +44,7 @@
   make-llama-server-configuration
   llama-server-configuration?
   (module llama-server-configuration-module
-          (default (car (find-files "/home/stalk/.cache/llama.cpp" "\\.gguf$"))))
+          (default "tencent/HY-MT1.5-1.8B-GGUF:Q4_K_M"))
   (port llama-server-configuration-port
         (default 5432))
   (threads llama-server-configuration-threads
@@ -66,7 +66,7 @@
            (provision '(llama-server))
            (start #~(make-forkexec-constructor
                      (list #$(file-append llama-cpp-latest "/bin/llama-server")
-                           "-m" #$module "--port" #$port "--ctx-size" #$memory-size
+                           "--hf-repo" #$module "--port" #$port "--ctx-size" #$memory-size
                            "--threads" #$threads
                            #$@extra-options)))
            (stop #~(make-kill-destructor))))))

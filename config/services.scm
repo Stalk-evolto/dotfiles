@@ -23,13 +23,9 @@
   #:use-module (srfi srfi-26)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 match)
-  #:use-module (shepherd service)
-  #:use-module (shepherd support)
-  #:use-module (shepherd system)
   #:export (append-service-extensions
             run-with-process
-            exec-thunk
-            fork+exec-thunk))
+            exec-thunk))
 
 (define (append-service-extensions type lst)
    "Return TYPE, a service type, involve the service extensions
@@ -250,117 +246,117 @@ targeting one of the types in LST."
                     (set-file-creation-mask file-creation-mask)
                     (apply-thunk thunk)))))
 
-(define %precious-signals
-  ;; Signals that the shepherd process handles.
-  (list SIGCHLD SIGINT SIGHUP SIGTERM))
+;; (define %precious-signals
+;;   ;; Signals that the shepherd process handles.
+;;   (list SIGCHLD SIGINT SIGHUP SIGTERM))
 
-(define (handle-unrecoverable-exception thunk exception)
-  "Handle @var{exception}, raised while attempting to execute @var{command}, by
-attempting to report it and exiting with a non-zero code."
-  (define (exception-handle)
-    (with-either-exception-handler
-     (lambda (exc) #f)
-     (lift0
-      (lambda ()
-        (format #t (gettext "Failed to run~{ ~s~}: ~a")
-                (object->string thunk)
-                (if (exception-with-kind-and-args? exception)
-                    (string-trim-right
-                     (call-with-output-string
-                       (lambda (port)
-                         (print-exception port #f
-                                          (exception-kind exception)
-                                          (exception-args exception)))))
-                    (object->string exception)))
-        (newline))
-      %either-monad)))
-  (dynamic-wind
-    (const #t)
-    exception-handle
-    (lambda () (primitive-exit 127))))
+;; (define (handle-unrecoverable-exception thunk exception)
+;;   "Handle @var{exception}, raised while attempting to execute @var{command}, by
+;; attempting to report it and exiting with a non-zero code."
+;;   (define (exception-handle)
+;;     (with-either-exception-handler
+;;      (lambda (exc) #f)
+;;      (lift0
+;;       (lambda ()
+;;         (format #t (gettext "Failed to run~{ ~s~}: ~a")
+;;                 (object->string thunk)
+;;                 (if (exception-with-kind-and-args? exception)
+;;                     (string-trim-right
+;;                      (call-with-output-string
+;;                        (lambda (port)
+;;                          (print-exception port #f
+;;                                           (exception-kind exception)
+;;                                           (exception-args exception)))))
+;;                     (object->string exception)))
+;;         (newline))
+;;       %either-monad)))
+;;   (dynamic-wind
+;;     (const #t)
+;;     exception-handle
+;;     (lambda () (primitive-exit 127))))
 
-(define-syntax-rule (with-exit-on-failure thunk exp ...)
-  "Evaluate @var{exp}.  Exit with a non-zero code if an exception is raised."
-  (with-either-exception-handler
-   (lambda (exception)
-     (handle-unrecoverable-exception thunk exception))
-   (lambda () exp ...)))
+;; (define-syntax-rule (with-exit-on-failure thunk exp ...)
+;;   "Evaluate @var{exp}.  Exit with a non-zero code if an exception is raised."
+;;   (with-either-exception-handler
+;;    (lambda (exception)
+;;      (handle-unrecoverable-exception thunk exception))
+;;    (lambda () exp ...)))
 
-(define (set-port-encoding port enc)
-  (with-either-exception-handler
-   (lambda (exc)
-     (lambda () exc))
-   (lift0 (lambda ()
-            (when enc
-           (set-port-encoding! port enc)))
-          %either-monad)))
+;; (define (set-port-encoding port enc)
+;;   (with-either-exception-handler
+;;    (lambda (exc)
+;;      (lambda () exc))
+;;    (lift0 (lambda ()
+;;             (when enc
+;;            (set-port-encoding! port enc)))
+;;           %either-monad)))
 
-(define (set-port-conversion-strategy port sym)
-  (with-either-exception-handler
-   (lambda (exc)
-     (lambda () exc))
-   (lift0 (lambda ()
-            (set-port-conversion-strategy! port sym))
-          %either-monad)))
+;; (define (set-port-conversion-strategy port sym)
+;;   (with-either-exception-handler
+;;    (lambda (exc)
+;;      (lambda () exc))
+;;    (lift0 (lambda ()
+;;             (set-port-conversion-strategy! port sym))
+;;           %either-monad)))
 
-(define* (fork+exec-thunk thunk
-                          #:key
-                          (user #f)
-                          (group #f)
-                          (supplementary-groups '())
-                          (log-file #f)
-                          (input-port #f)
-                          (log-encoding "UTF-8")
-                          (extra-ports '())
-                          (directory (default-service-directory))
-                          (file-creation-mask #f)
-                          (create-session? #t)
-                          (environment-variables
-                           (default-environment-variables))
-                          (listen-pid-variable? #f)
-                          (resource-limits '()))
+;; (define* (fork+exec-thunk thunk
+;;                           #:key
+;;                           (user #f)
+;;                           (group #f)
+;;                           (supplementary-groups '())
+;;                           (log-file #f)
+;;                           (input-port #f)
+;;                           (log-encoding "UTF-8")
+;;                           (extra-ports '())
+;;                           (directory (default-service-directory))
+;;                           (file-creation-mask #f)
+;;                           (create-session? #t)
+;;                           (environment-variables
+;;                            (default-environment-variables))
+;;                           (listen-pid-variable? #f)
+;;                           (resource-limits '()))
 
-  (define (child-thunk log-input log-output)
-    (lambda ()
-      ;; Exit the child process with non-zero when something throws, such as the
-      ;; 'chdir' or 'execl' calls made by 'exec-command'.
-      (with-exit-on-failure thunk
-        ;; First restore the default handlers.
-        (for-each (cut sigaction <> SIG_DFL) %precious-signals)
+;;   (define (child-thunk log-input log-output)
+;;     (lambda ()
+;;       ;; Exit the child process with non-zero when something throws, such as the
+;;       ;; 'chdir' or 'execl' calls made by 'exec-command'.
+;;       (with-exit-on-failure thunk
+;;         ;; First restore the default handlers.
+;;         (for-each (cut sigaction <> SIG_DFL) %precious-signals)
 
-        ;; Unblock any signals that have been blocked by the parent process.
-        (unblock-signals %precious-signals)
+;;         ;; Unblock any signals that have been blocked by the parent process.
+;;         (unblock-signals %precious-signals)
 
-        (close-port log-input)
-        ((exec-thunk thunk
-                     #:user user
-                     #:group group
-                     #:supplementary-groups supplementary-groups
-                     #:log-port log-output
-                     #:input-port input-port
-                     #:extra-ports extra-ports
-                     #:directory directory
-                     #:file-creation-mask file-creation-mask
-                     #:create-session? create-session?
-                     #:environment-variables
-                     (if listen-pid-variable?
-                         (cons (string-append "LISTEN_PID="
-                                              (number->string (getpid)))
-                               environment-variables)
-                         environment-variables)
-                     #:resource-limits resource-limits)))))
+;;         (close-port log-input)
+;;         ((exec-thunk thunk
+;;                      #:user user
+;;                      #:group group
+;;                      #:supplementary-groups supplementary-groups
+;;                      #:log-port log-output
+;;                      #:input-port input-port
+;;                      #:extra-ports extra-ports
+;;                      #:directory directory
+;;                      #:file-creation-mask file-creation-mask
+;;                      #:create-session? create-session?
+;;                      #:environment-variables
+;;                      (if listen-pid-variable?
+;;                          (cons (string-append "LISTEN_PID="
+;;                                               (number->string (getpid)))
+;;                                environment-variables)
+;;                          environment-variables)
+;;                      #:resource-limits resource-limits)))))
 
-    ;; Child processes inherit signal handlers until they exec.  If one of
-  ;; %PRECIOUS-SIGNALS is received by the child before it execs, the installed
-  ;; handler, which stops shepherd, is called.  To avoid this, block signals
-  ;; so that the child process never executes those handlers.
-  (with-blocked-signals %precious-signals
-    (match (pipe O_NONBLOCK)
-      ((log-input . log-output)
-       (let* ((pid (run-with-process (child-thunk log-input log-output)))
-              (log-input (non-blocking-port log-input)))
-         (close-port log-output)
-         (sequence %either-monad
-                   (list (set-port-encoding log-input log-encoding)
-                         (set-port-conversion-strategy log-input 'substitute)))
-         pid)))))
+;;     ;; Child processes inherit signal handlers until they exec.  If one of
+;;   ;; %PRECIOUS-SIGNALS is received by the child before it execs, the installed
+;;   ;; handler, which stops shepherd, is called.  To avoid this, block signals
+;;   ;; so that the child process never executes those handlers.
+;;   (with-blocked-signals %precious-signals
+;;     (match (pipe O_NONBLOCK)
+;;       ((log-input . log-output)
+;;        (let* ((pid (run-with-process (child-thunk log-input log-output)))
+;;               (log-input (non-blocking-port log-input)))
+;;          (close-port log-output)
+;;          (sequence %either-monad
+;;                    (list (set-port-encoding log-input log-encoding)
+;;                          (set-port-conversion-strategy log-input 'substitute)))
+;;          pid)))))

@@ -24,119 +24,154 @@
 ;; See the "Replicating Guix" section in the manual.
 
 (define-module (config home home-config)
-  #:use-module (gnu packages)
-  #:use-module (gnu services)
-  #:use-module (gnu home)
-  #:use-module (gnu home services)
-  #:use-module (gnu home services shells)
-  #:use-module (gnu home services ssh)
+  #:use-module (config home services emacs)
+  #:use-module (config home services home-channels)
+  #:use-module (config home services llvm)
+  #:use-module (config home services monerod)
+  #:use-module (config packages eclip)
+  #:use-module (config packages machine-learning)
+  #:use-module (gnu home services desktop)
   #:use-module (gnu home services dotfiles)
   #:use-module (gnu home services messaging)
   #:use-module (gnu home services secrets)
-  #:use-module (gnu home services desktop)
+  #:use-module (gnu home services shells)
+  #:use-module (gnu home services ssh)
+  #:use-module (gnu home services)
+  #:use-module (gnu home)
+  #:use-module (gnu packages admin)
+  #:use-module (gnu packages aspell)
+  #:use-module (gnu packages autotools)
+  #:use-module (gnu packages base)
+  #:use-module (gnu packages check)
+  #:use-module (gnu packages curl)
+  #:use-module (gnu packages databases)
+  #:use-module (gnu packages emacs)
+  #:use-module (gnu packages emacs-xyz)
+  #:use-module (gnu packages finance)
+  #:use-module (gnu packages fonts)
+  #:use-module (gnu packages fontutils)
+  #:use-module (gnu packages gdb)
+  #:use-module (gnu packages gettext)
+  #:use-module (gnu packages gimp)
+  #:use-module (gnu packages gnupg)
+  #:use-module (gnu packages graphviz)
+  #:use-module (gnu packages guile)
+  #:use-module (gnu packages guile-xyz)
+  #:use-module (gnu packages jami)
+  #:use-module (gnu packages kde-multimedia)
+  #:use-module (gnu packages libreoffice)
+  #:use-module (gnu packages maths)
+  #:use-module (gnu packages networking)
+  #:use-module (gnu packages python)
+  #:use-module (gnu packages python-check)
+  #:use-module (gnu packages python-xyz)
+  #:use-module (gnu packages rust-apps)
+  #:use-module (gnu packages tex)
+  #:use-module (gnu packages texinfo)
+  #:use-module (gnu packages version-control)
+  #:use-module (gnu packages video)
+  #:use-module (gnu packages virtualization)
+  #:use-module (gnu packages)
+  #:use-module (gnu services)
   #:use-module (gnu system shadow)
-  #:use-module (config home services home-channels)
-  #:use-module (config home services llvm)
-  #:use-module (config home services emacs)
-  #:use-module (config home services monerod)
-  #:use-module (config packages eclip)
+  #:use-module (guix build utils)
   #:use-module (guix gexp)
+  #:use-module (nongnu packages mozilla)
   #:use-module (srfi srfi-1))
 
 ;; Emacs compile GNU Guix to use packages.
 (define %emacs-base-packages
-  (list "aspell"
-        "aspell-dict-en"
-	"emacs"
-        "emacs-debbugs"
-        "git"
-        "ripgrep"))
+  (list aspell
+        aspell-dict-en
+	emacs
+        emacs-debbugs
+        git
+        ripgrep))
 
 (define %emacs-for-guix
-  (list "emacs-geiser"
-        "emacs-geiser-guile"
-	"emacs-paredit"
-        "guile"
-        "guile-readline"
-        "guile-colorized"
-        "guile-hall"
-        "guile-fibers"
-        "guile-git"))
+  (list emacs-geiser
+        emacs-geiser-guile
+	emacs-paredit
+        guile-3.0-latest
+        guile-readline
+        guile-colorized
+        guile-hall
+        guile-fibers
+        guile-git))
 
 (define %emacs-for-c
-  (list "binutils"
-        "gdb"
-        "autoconf"
-        "automake"
-        "libtool"
-        "make"))
+  (list binutils
+        gdb
+        autoconf
+        automake
+        libtool
+        gnu-make))
 
 (define %emacs-for-python
-  (list "python-wrapper"
-	"python-lsp-server"
-        "python-black"
-        "python-flake8"
-        "python-jedi"
-        "python-invoke"
-        "python-pycodestyle"
-        "python-pytest-pycodestyle"
-        "python-pylint"
-        "python-yapf"))
+  (list python-wrapper
+	python-lsp-server
+        python-black
+        python-flake8
+        python-jedi
+        python-invoke
+        python-pycodestyle
+        python-pytest-pycodestyle
+        python-pylint
+        python-yapf))
 
 (define %emacs-for-texinfo
-  (list "calc"
-        "curl"
-        "font-arphic-ukai"
-        "font-google-noto-serif-cjk"
-        "font-google-noto-serif-cjk-static"
-        "gettext"
-        "pinentry"
-        "rubber"
-        "texi2html"
-        "texinfo"))
+  (list calc
+        curl
+        font-arphic-ukai
+        font-google-noto-serif-cjk
+        font-google-noto-serif-cjk-static
+        gnu-gettext
+        pinentry
+        rubber
+        texi2html
+        texinfo))
 
 (define %llms
-  (list "llama-cpp-latest"))
+  (list llama-cpp-latest))
 
 (define %hack-tools
-  (list "nmap"
-        "wireshark"
-        "tcpdump"))
+  (list nmap
+        wireshark
+        tcpdump))
 
 (home-environment
  ;; Below is the list of packages that will show up in your
  ;; Home profile, under ~/.guix-home/profile.
  (packages
-  (specifications->packages
-   (append
-    (list
-     "electron-cash"
-     "electrum"
-     "firefox"
-     "font-adobe-source-han-sans:cn"
-     "font-gnu-freefont"
-     "font-gnu-unifont"
-     "font-wqy-microhei"
-     "fontconfig"
-     "gimp"
-     "gnupg"
-     "graphviz"
-     "jami"
-     "kdenlive"
-     "libreoffice"
-     "monero"
-     "obs"
-     "pinentry"
-     "recutils"
-     "virt-manager"
-     "vlc")
-    %emacs-base-packages
-    %emacs-for-guix
-    %emacs-for-c
-    %emacs-for-python
-    %emacs-for-texinfo
-    %hack-tools
-    %llms)))
+  (append
+   (list
+    electron-cash
+    electrum
+    firefox
+    `(,font-adobe-source-han-sans "cn")
+    font-gnu-freefont
+    font-gnu-unifont
+    font-wqy-microhei
+    fontconfig
+    gimp
+    gnupg
+    graphviz
+    jami
+    kdenlive
+    libreoffice
+    monero
+    obs
+    pinentry
+    recutils
+    virt-manager
+    vlc)
+   %emacs-base-packages
+   %emacs-for-guix
+   %emacs-for-c
+   %emacs-for-python
+   %emacs-for-texinfo
+   %hack-tools
+   %llms))
 
  ;; Below is the list of Home services.  To search for available
  ;; services, run 'guix home search KEYWORD' in a terminal.
