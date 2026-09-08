@@ -2251,3 +2251,147 @@ $9 = ("." ".." "webutils")
 
   (test-end "Foreign Function Interface")
 #+end_src
+
+* Embedded into the static C
+
+如果你想在你的 C 程序里使用 guile scheme 模块或者脚本程序，可以在 C 程序中嵌入 guile
+
+** 示例
+
+我使用的是 Guix 操作系统，可以通过以下命令添加依赖项
+#+begin_src bash
+  guix shell autoconf automake libtool pkg-config guile gcc-toolchain
+#+end_src
+
+然后创建基本目录结构
+
+embedded_guile2c
+├── bootstrap
+├── configure.ac
+├── Makefile.am
+├── README
+└── src
+    ├── bessel.c
+    └── Makefile.am
+
+其中
+- bootstrap
+  #+begin_src bash
+    #!/bin/sh
+
+    autoreconf -vfi
+  #+end_src
+
+- configure.ac
+  #+begin_src bash
+    #                                               -*- Autoconf -*-
+    # Process this file with autoconf to produce a configure script.
+
+    AC_PREREQ([2.72])
+    AC_INIT([embedded_guile2c],[VERSION],[BUG-REPORT-ADDRESS])
+    AM_INIT_AUTOMAKE([-Wall -Werror foreign])
+    LT_INIT
+    AC_CONFIG_MACRO_DIR([m4])
+    AC_CONFIG_HEADERS([config.h])
+    AC_CONFIG_SRCDIR(src/)
+    AC_CONFIG_FILES([Makefile src/Makefile])
+    AC_CONFIG_COMMANDS([default],[date > stamp-h ],[])
+
+    # Checks for programs.
+    AM_PROG_AR
+    AC_PROG_CC
+
+    # Checks for libraries.
+    PKG_CHECK_MODULES([GUILE], [guile-3.0])
+
+    AC_OUTPUT
+  #+end_src
+
+- Makefile.am
+  #+begin_src bash
+    SUBDIRS = src/
+    dist_doc_DATA = README
+  #+end_src
+
+- src/bessel.c
+  #+begin_src C
+    #include <libguile.h>
+
+    static void
+    inner_main (void *closure, int argc, char **argv)
+    {
+        /* preparation */
+        scm_shell (argc, argv);
+        /* after exit */
+    }
+
+    int
+    main (int argc, char **argv)
+    {
+        scm_boot_guile (argc, argv, inner_main, 0);
+        return 0; /* never reached, see inner_main */
+    }
+  #+end_src
+
+- src/Makefile.am
+  #+begin_src bash
+    top = ../
+
+    bin_PROGRAMS = bessel
+    bessel_CFLAGS = @GUILE_CFLAGS@
+    bessel_LDADD =
+    bessel_LDFLAGS = @GUILE_LIBS@
+    bessel_SOURCES = bessel.c libguile.h
+  #+end_src
+
+然后可以构建 bessel
+#+begin_src bash
+  ./bootstrap
+  ./configure
+  make
+#+end_src
+
+最终得到二进制文件 bessel ，运行得到一个 guile repl
+
+** Autotools 详解
+
+*** 命令编译
+构建一个 C 程序，最简单的办法就是使用命令行里的编译器命令，例如
+
+#+begin_src bash
+  gcc -c $(pkg-config --cflags guile-3.0) bessel.c
+  gcc bessel.o $(pkg-config --libs guile-3.0) -o bessel
+#+end_src
+
+但是，一旦需要编译的文件数量增加，需要执行的编译与链接命令也会随之增加，这时候我们需要一种构建系统来管理这些文件之间的关系
+每次编译之前需要清理与目标同名的文件，因为无法判断源文件的修改会影响哪些文件。虽然可以使用 git clean -xffd 清理未跟踪的文件，但是每次清理后需要重新编译所有文件。
+
+*** make
+GNU make 是一个构建系统，用于管理编译所需的规则，并可通过修改时间只编译变更过的文件。
+
+以上命令可编写为以下 Makefile
+#+begin_src makefile
+  bessel: bessel.o
+  	gcc bessel.o $(pkg-config --libs guile-3.0) -o bessel
+  bessel.o: bessel.c
+  	gcc -c $(pkg-config --cflags guile-3.0) bessel.c
+#+end_src
+
+在大型项目中，需要编译的文件数量众多， Makefile 变得复杂，手动编写 Makefile 有两个重要难题
+1. 为了适配不同的操作系统环境策略，你可能需要编写一系列判断规则用来检查环境变量以及编译所需的依赖项
+2. 构建命令有大量的重复之处，可以使用变量统一管理，但是这样的 Makefile 变得抽象导致不可读
+
+*** Autotools
+
+**** 工具介绍
+- autoconf
+  用于检测当前操作系统环境以生成不同 Makefile 的脚本。
+
+- automake
+  用于将大量变量替换的 Makefile 使用 key = value 形式配置的脚本。
+
+- libtool
+  用于简化创建静态和动态链接库过程的脚本。
+
+**** 一个简单的例子
+例如我有以下目录结构
